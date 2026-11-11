@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "linkedin-researcher"
+version = "0.2.0"
+description = "Ferramenta local e configurável de pesquisa de recrutadores, empresas, vagas e análise de aderência curricular no LinkedIn."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "LinkedIn Researcher Team" }
+]
+dependencies = [
+    "google-genai>=1.0.0",
+    "playwright>=1.49.0",
+    "pydantic>=2.7.0",
+    "python-dotenv>=1.0.1",
+    "pypdf>=4.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.4.0",
+]
+
+[project.scripts]
+linkedin-researcher = "linkedin_researcher.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-v --tb=short"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

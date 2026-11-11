@@ -1,0 +1,59 @@
+{
+  "full_name": "Nome do Candidato",
+  "location": "Cidade, Estado",
+  "linkedin_url": "https://www.linkedin.com/in/perfil-exemplo",
+  "education": "Formação acadêmica principal e instituição",
+  "contract_availability": ["CLT", "PJ"],
+  "has_active_mei": false,
+  "preferred_work_model": "Remoto ou Híbrido",
+  "priority_areas": [
+    "Administrativa",
+    "Financeira",
+    "Comercial",
+    "Operações"
+  ],
+  "target_levels": [
+    "Assistente",
+    "Analista"
+  ],
+  "target_roles_primary": [
+    "Assistente Administrativo",
+    "Assistente Financeiro"
+  ],
+  "target_roles_expanded": [
+    "Analista Administrativo Júnior",
+    "Assistente de Operações"
+  ],
+  "excluded_roles_and_levels": [
+    "Gerente",
+    "Diretor",
+    "Coordenador"
+  ],
+  "proven_competencies": [
+    "rotinas administrativas",
+    "controles em planilhas",
+    "atendimento ao cliente",
+    "Pacote Office"
+  ],
+  "behavioral_competencies": [
+    "organização",
+    "comunicação assertiva",
+    "trabalho em equipe"
+  ],
+  "office_proficiency": "Pacote Office intermediário",
+  "experiences": [
+    {
+      "company": "Empresa Exemplo LTDA",
+      "period_pdf": "01/2020 – Atual",
+      "role_in_pdf": "Assistente Administrativo",
+      "positioning_role": "Assistente Administrativo",
+      "is_current": true,
+      "activities": [
+        "Elaboração de planilhas e relatórios operacionais",
+        "Atendimento a clientes e fornecedores",
+        "Organização de documentos e notas fiscais"
+      ]
+    }
+  ]
+}
+

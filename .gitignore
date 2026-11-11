@@ -1,0 +1,84 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Environment variables & secrets (NEVER commit credentials or session tokens)
+.env
+.env.*
+!.env.example
+
+# Playwright persistent profiles, session state, traces & screenshots
+.playwright-profile/
+.browser-profile/
+browser_profile/
+user_data_dir/
+storage_state*.json
+*cookies*.json
+*session*.json
+playwright-report/
+test-results/
+trace*.zip
+screenshots/
+diagnostic_*.png
+*.png
+
+# ==============================================================================
+# PRIVACY & PERSONAL DATA PROTECTION (Strictly avoid committing personal data)
+# ==============================================================================
+
+# Resumes and Candidate Documents (never commit real candidate PDFs or docs)
+curriculum/*
+!curriculum/.gitkeep
+*.pdf
+*.docx
+
+# Local Databases and Scraped JSON Data
+data/*.json
+!data/*.template.json
+data/*.md
+!data/*.template.md
+!data/.gitkeep
+
+# Generated Outputs, Reports and Draft Messages
+output/**/*
+!output/**/.gitkeep
+!output/.gitkeep
+
+# Logs and local diagnostics (may contain session/personal info)
+logs/*
+!logs/.gitkeep
+
+# Candidate-specific brief and specification files
+brief_projeto_*.md
+!brief_projeto.template.md
+especificacao_tecnica_*.md
+!especificacao_tecnica.template.md
+
+# Testing & linting caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# OS / IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
