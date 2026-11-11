@@ -243,6 +243,14 @@ class JsonStorage:
             return [m for m in messages if m.recruiter_id == recruiter_id]
         return messages
 
+    def get_message(self, message_id: str) -> SuggestedMessage | None:
+        """Obtém uma mensagem específica pelo identificador."""
+        target = message_id.strip()
+        for msg in self.list_messages():
+            if msg.id == target:
+                return msg
+        return None
+
     def upsert_message(self, message: SuggestedMessage) -> SuggestedMessage:
         """Insere ou atualiza rascunho de mensagem por id."""
         existing = self.list_messages()

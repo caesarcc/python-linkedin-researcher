@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import re
 import sys
 from importlib.metadata import version as pkg_version
 from pathlib import Path
@@ -28,7 +29,13 @@ from linkedin_researcher.browser.session_manager import (
 )
 from linkedin_researcher.config import load_config
 from linkedin_researcher.logging_config import setup_logging
-from linkedin_researcher.models import MatchLevel
+from linkedin_researcher.messaging.message_generator import (
+    generate_all_drafts,
+    generate_consolidated_report,
+    generate_message_draft,
+    review_message,
+)
+from linkedin_researcher.models import MatchLevel, ReviewStatus
 from linkedin_researcher.research.company_research import (
     research_companies,
     research_company_by_id,
@@ -378,6 +385,140 @@ def run_jobs_match(
     return 0
 
 
+def run_messages_list(recruiter_id: str | None = None) -> int:
+    """Lista as mensagens cadastradas em data/contatos.json."""
+    cfg = load_config()
+    setup_logging(cfg.logs_dir, cfg.log_level)
+    storage = JsonStorage(cfg)
+    messages = storage.list_messages(recruiter_id=recruiter_id)
+
+    filter_desc = f" para o recrutador '{recruiter_id}'" if recruiter_id else ""
+    print(f"\n=== Mensagens Sugeridas Cadastradas ({len(messages)}){filter_desc} ===")
+    if not messages:
+        print("Nenhuma mensagem gerada ainda. Use 'messages draft --recruiter-id <id>' ou '--all'.")
+        return 0
+
+    for m in messages:
+        rec = storage.get_recruiter(m.recruiter_id)
+        rec_name = rec.name if rec else m.recruiter_id
+        sent_info = f"Sim ({m.sent_at[:10]})" if m.sent_by_user and m.sent_at else "Não"
+        preview = m.message_text.replace("\n", " ")[:80] + "..."
+        slug = re.sub(r"[^a-z0-9]+", "-", m.recruiter_id.casefold()).strip("-")
+        print(f"- [{m.id}] Destinatário: {rec_name} ({m.recruiter_id})")
+        print(f"  Status de Revisão: {m.review_status.value} | Enviada manualmente: {sent_info}")
+        print(f"  Contexto: {m.context}")
+        print(f"  Prévia: \"{preview}\"")
+        print(f"  Arquivo Markdown: output/mensagens/{slug}.md\n")
+    return 0
+
+
+def run_messages_draft(
+    recruiter_id: str | None = None,
+    draft_all: bool = False,
+    job_id: str | None = None,
+    refresh: bool = False,
+    force_offline: bool = False,
+) -> int:
+    """Gera rascunho de mensagem para um recrutador ou para todos os cadastrados."""
+    cfg = load_config()
+    setup_logging(cfg.logs_dir, cfg.log_level)
+
+    if draft_all or recruiter_id == "all":
+        print("\n=== Gerando Rascunhos de Mensagens para Todos os Recrutadores ===")
+        msgs = generate_all_drafts(cfg, refresh=refresh, force_offline=force_offline)
+        storage = JsonStorage(cfg)
+        for m in msgs:
+            rec = storage.get_recruiter(m.recruiter_id)
+            rec_name = rec.name if rec else m.recruiter_id
+            print(f"- [{m.id}] {rec_name} -> {m.review_status.value}")
+        print(
+            f"\n[OK] {len(msgs)} rascunho(s) pronto(s) para revisão em "
+            "output/mensagens/ e data/contatos.json."
+        )
+        return 0
+
+    if not recruiter_id:
+        print("[ERRO] Informe --recruiter-id <id> ou use --all para todos os cadastrados.")
+        return 1
+
+    print(f"\n=== Gerando Rascunho de Mensagem para: {recruiter_id} ===")
+    msg = generate_message_draft(
+        config=cfg,
+        recruiter_id=recruiter_id,
+        job_id=job_id,
+        refresh=refresh,
+        force_offline=force_offline,
+    )
+    storage = JsonStorage(cfg)
+    rec = storage.get_recruiter(msg.recruiter_id)
+    rec_name = rec.name if rec else msg.recruiter_id
+    slug = re.sub(r"[^a-z0-9]+", "-", msg.recruiter_id.casefold()).strip("-")
+
+    print("[OK] Rascunho gerado com sucesso!")
+    print(f"  -> ID: {msg.id}")
+    print(f"  -> Destinatário: {rec_name}")
+    print(f"  -> Status: {msg.review_status.value} (Enviado pelo usuário: {msg.sent_by_user})")
+    print(f"  -> Contexto: {msg.context}")
+    print(f"  -> Arquivo Markdown: output/mensagens/{slug}.md\n")
+    print("--- Texto Sugerido para Envio Manual ---")
+    print(msg.message_text.strip())
+    print("----------------------------------------")
+    return 0
+
+
+def run_messages_review(
+    message_id: str,
+    status_str: str | None = None,
+    mark_sent: bool = False,
+    notes: str | None = None,
+) -> int:
+    """Atualiza o status de revisão humana de uma mensagem."""
+    cfg = load_config()
+    setup_logging(cfg.logs_dir, cfg.log_level)
+
+    status_map = {
+        "pendente": ReviewStatus.PENDING_REVIEW,
+        "aprovada": ReviewStatus.APPROVED,
+        "editada": ReviewStatus.EDITED,
+        "descartada": ReviewStatus.DISCARDED,
+    }
+    status_enum = status_map.get(status_str.strip().casefold()) if status_str else None
+
+    if status_str and status_enum is None:
+        print(
+            f"[ERRO] Status inválido '{status_str}'. "
+            "Use: pendente, aprovada, editada ou descartada."
+        )
+        return 1
+
+    updated = review_message(
+        config=cfg,
+        message_id=message_id,
+        status=status_enum,
+        mark_sent=mark_sent,
+        notes=notes,
+    )
+    print(f"[OK] Mensagem '{updated.id}' atualizada com sucesso.")
+    print(f"  -> Status de revisão: {updated.review_status.value}")
+    print(f"  -> Enviada manualmente pelo usuário: {'Sim' if updated.sent_by_user else 'Não'}")
+    if updated.sent_at:
+        print(f"  -> Data do envio manual: {updated.sent_at}")
+    if updated.notes:
+        print(f"  -> Anotações: {updated.notes}")
+    return 0
+
+
+def run_report(output_path: Path | None = None) -> int:
+    """Gera o relatório geral consolidado do projeto."""
+    cfg = load_config()
+    setup_logging(cfg.logs_dir, cfg.log_level)
+    report_file = generate_consolidated_report(cfg, output_path=output_path)
+    print("\n=== Relatório Geral Consolidado Gerado com Sucesso ===")
+    print(f"[OK] Arquivo salvo em: {report_file}")
+    print("O relatório consolida perfil do candidato, vagas ranqueadas, empresas e mensagens.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="linkedin-researcher",
@@ -556,13 +697,49 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     messages_parser = subparsers.add_parser(
-        "messages", help="Elaboração de mensagens para revisão humana"
+        "messages", help="Elaboração e revisão de mensagens para controle humano"
     )
     messages_sub = messages_parser.add_subparsers(dest="messages_action", required=True)
-    msg_draft = messages_sub.add_parser("draft", help="Gerar rascunho de mensagem para revisão")
-    msg_draft.add_argument("--recruiter-id", required=True, help="ID do recrutador")
 
-    subparsers.add_parser("report", help="Gerar relatório consolidado")
+    msg_draft = messages_sub.add_parser("draft", help="Gerar rascunho de mensagem para revisão")
+    msg_draft_grp = msg_draft.add_mutually_exclusive_group(required=True)
+    msg_draft_grp.add_argument(
+        "--recruiter-id", help="ID do recrutador (ou 'all' para todos)"
+    )
+    msg_draft_grp.add_argument(
+        "--all", action="store_true", help="Gerar rascunhos para todos os recrutadores cadastrados"
+    )
+    msg_draft.add_argument("--job-id", help="Vincular a uma vaga específica analisada")
+    msg_draft.add_argument(
+        "--refresh", action="store_true", help="Forçar nova geração ignorando cache"
+    )
+    msg_draft.add_argument(
+        "--offline", action="store_true", help="Forçar geração determinística local (sem Gemini)"
+    )
+
+    msg_list = messages_sub.add_parser("list", help="Listar mensagens e rascunhos gerados")
+    msg_list.add_argument("--recruiter-id", help="Filtrar mensagens de um recrutador específico")
+
+    msg_review = messages_sub.add_parser(
+        "review", help="Atualizar status de revisão e registro manual de envio"
+    )
+    msg_review.add_argument("--id", required=True, help="ID da mensagem a revisar")
+    msg_review.add_argument(
+        "--status",
+        choices=["pendente", "aprovada", "editada", "descartada"],
+        help="Novo status da revisão humana",
+    )
+    msg_review.add_argument(
+        "--mark-sent",
+        action="store_true",
+        help="Registrar que você enviou manualmente a mensagem pelo seu LinkedIn",
+    )
+    msg_review.add_argument("--notes", help="Observações ou anotações da revisão")
+
+    report_parser = subparsers.add_parser("report", help="Gerar relatório geral consolidado")
+    report_parser.add_argument(
+        "--output", type=Path, default=None, help="Caminho customizado para o arquivo markdown"
+    )
 
     return parser
 
@@ -697,6 +874,28 @@ def main(argv: list[str] | None = None) -> int:
                     f"  -> URL: {job.application_url}"
                 )
                 return 0
+
+        if args.command == "messages":
+            if args.messages_action == "list":
+                return run_messages_list(recruiter_id=args.recruiter_id)
+            if args.messages_action == "draft":
+                return run_messages_draft(
+                    recruiter_id=args.recruiter_id,
+                    draft_all=bool(args.all or (args.recruiter_id and args.recruiter_id == "all")),
+                    job_id=args.job_id,
+                    refresh=args.refresh,
+                    force_offline=args.offline,
+                )
+            if args.messages_action == "review":
+                return run_messages_review(
+                    message_id=args.id,
+                    status_str=args.status,
+                    mark_sent=args.mark_sent,
+                    notes=args.notes,
+                )
+
+        if args.command == "report":
+            return run_report(output_path=args.output)
 
     except ManualInterventionRequiredError as exc:
         print(f"\n[AÇÃO HUMANA NECESSÁRIA] {exc}")

@@ -180,6 +180,39 @@ linkedin-researcher jobs list --level alta --ranked
 linkedin-researcher jobs list --model remoto
 ```
 
+### 6. Rascunhos de Mensagens e Relatórios (Human-in-the-Loop)
+
+> [!IMPORTANT]
+> **Controle Humano Obrigatório**: O sistema **nunca** envia mensagens ou convites automaticamente no LinkedIn. Todos os textos são gerados como rascunhos para leitura, personalização e envio manual a partir da sua conta.
+
+```powershell
+# Gerar rascunho de primeiro contato para um recrutador específico
+linkedin-researcher messages draft --recruiter-id rec-01-fulano-de-tal
+
+# Gerar rascunho vinculando a uma vaga específica cadastrada
+linkedin-researcher messages draft --recruiter-id rec-01-fulano-de-tal --job-id job-empresa-x-assistente
+
+# Gerar rascunhos para todos os recrutadores cadastrados (modo determinístico ou híbrido Gemini)
+linkedin-researcher messages draft --all
+linkedin-researcher messages draft --all --offline  # força templates determinísticos locais
+
+# Listar mensagens geradas e seus status de revisão
+linkedin-researcher messages list
+linkedin-researcher messages list --recruiter-id rec-01-fulano-de-tal
+
+# Atualizar status de revisão após conferência manual
+linkedin-researcher messages review --id msg-rec-01-fulano-de-tal --status aprovado
+
+# Registrar envio manual feito via LinkedIn
+linkedin-researcher messages review --id msg-rec-01-fulano-de-tal --mark-sent
+
+# Gerar relatório executivo consolidado com panorama de recrutadores, vagas e contatos
+linkedin-researcher report
+linkedin-researcher report --output output/meu_relatorio.md
+```
+
+Os rascunhos detalhados ficam disponíveis tanto na base estruturada `data/contatos.json` quanto em arquivos individuais de fácil leitura e edição em `output/mensagens/<slug-recrutador>.md` (com checklist de verificação humana). O relatório executivo é gerado em `output/relatorio_consolidado.md`.
+
 ---
 
 ## 🧪 Testes Automatizados
