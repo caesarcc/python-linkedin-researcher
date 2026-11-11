@@ -13,12 +13,22 @@ from linkedin_researcher.analysis.curriculum_profile import (
     load_candidate_profile,
     save_candidate_profile,
 )
+from linkedin_researcher.analysis.job_matching import (
+    match_all_jobs,
+    match_job,
+)
+from linkedin_researcher.analysis.ranking import (
+    filter_jobs_by_match_level,
+    filter_jobs_by_work_model,
+    rank_jobs,
+)
 from linkedin_researcher.browser.session_manager import (
     ManualInterventionRequiredError,
     interactive_login,
 )
 from linkedin_researcher.config import load_config
 from linkedin_researcher.logging_config import setup_logging
+from linkedin_researcher.models import MatchLevel
 from linkedin_researcher.research.company_research import (
     research_companies,
     research_company_by_id,
@@ -247,16 +257,50 @@ def run_companies_list() -> int:
     return 0
 
 
-def run_jobs_list() -> int:
-    """Lista as vagas cadastradas em data/vagas.json."""
+def run_jobs_list(
+    level_filter: str | None = None,
+    model_filter: str | None = None,
+    ranked: bool = False,
+) -> int:
+    """Lista as vagas cadastradas em data/vagas.json com suporte a filtros e ranking."""
     cfg = load_config()
     setup_logging(cfg.logs_dir, cfg.log_level)
     storage = JsonStorage(cfg)
     jobs = storage.list_jobs()
 
-    print(f"\n=== Vagas Cadastradas ({len(jobs)}) ===")
     if not jobs:
+        print("\n=== Vagas Cadastradas (0) ===")
         print("Nenhuma vaga registrada ainda. Use 'jobs search' ou 'jobs add-url' para coletar.")
+        return 0
+
+    if level_filter:
+        clean_lvl = level_filter.strip().casefold()
+        if "alta" in clean_lvl:
+            jobs = filter_jobs_by_match_level(jobs, min_level=MatchLevel.HIGH)
+        elif "med" in clean_lvl:
+            jobs = filter_jobs_by_match_level(jobs, min_level=MatchLevel.MEDIUM)
+        elif "baix" in clean_lvl:
+            jobs = filter_jobs_by_match_level(jobs, min_level=MatchLevel.LOW)
+
+    if model_filter:
+        jobs = filter_jobs_by_work_model(jobs, allowed_models=[model_filter])
+
+    if ranked:
+        profile = load_candidate_profile(cfg)
+        jobs = rank_jobs(jobs, profile)
+
+    filter_info: list[str] = []
+    if level_filter:
+        filter_info.append(f"nível>={level_filter}")
+    if model_filter:
+        filter_info.append(f"modalidade={model_filter}")
+    if ranked:
+        filter_info.append("ranqueadas")
+    filter_desc = f" [{', '.join(filter_info)}]" if filter_info else ""
+
+    print(f"\n=== Vagas Cadastradas ({len(jobs)}){filter_desc} ===")
+    if not jobs:
+        print("Nenhuma vaga corresponde aos filtros aplicados.")
         return 0
 
     for j in jobs:
@@ -270,7 +314,67 @@ def run_jobs_list() -> int:
             f"  Contratação: {j.contract_type} | Salário: {j.salary_range} | "
             f"Aderência: {match_str} ({score_str})"
         )
+        if j.strengths:
+            print(f"  + Pontos fortes: {'; '.join(j.strengths[:2])}")
+        if j.gaps:
+            print(f"  - Pontos de atenção: {'; '.join(j.gaps[:2])}")
         print(f"  URL: {j.application_url}")
+    return 0
+
+
+def run_jobs_match(
+    job_id: str | None = None,
+    match_all: bool = False,
+    refresh: bool = False,
+    force_offline: bool = False,
+) -> int:
+    """Executa a análise explicável de aderência de uma vaga ou de todas as cadastradas."""
+    cfg = load_config()
+    setup_logging(cfg.logs_dir, cfg.log_level)
+
+    if match_all or job_id == "all":
+        print("\n=== Avaliando Aderência de Todas as Vagas ===")
+        updated_list = match_all_jobs(cfg, refresh=refresh, force_offline=force_offline)
+        if not updated_list:
+            print("[AVISO] Nenhuma vaga cadastrada para avaliar. Use 'jobs search' ou 'jobs add'.")
+            return 0
+        ranked = rank_jobs(updated_list)
+        for j in ranked:
+            score_str = f"{j.match_score:.0f}/100" if j.match_score is not None else "-"
+            print(f"\n- [{j.id}] {j.title} ({j.company}) -> {j.match_level.value} ({score_str})")
+            if j.strengths:
+                print(f"  + Pontos fortes: {'; '.join(j.strengths[:3])}")
+            if j.gaps:
+                print(f"  - Pontos de atenção: {'; '.join(j.gaps[:2])}")
+        print(
+            f"\n[OK] {len(updated_list)} vaga(s) processada(s). "
+            f"Relatório atualizado em: output/oportunidades/resumo_vagas.md"
+        )
+        return 0
+
+    if not job_id:
+        print("[ERRO] Informe --id <id> da vaga ou use --all para avaliar todas.")
+        return 1
+
+    print(f"\n=== Avaliando Aderência da Vaga: {job_id} ===")
+    j = match_job(cfg, job_id=job_id, refresh=refresh, force_offline=force_offline)
+    score_str = f"{j.match_score:.0f}/100" if j.match_score is not None else "-"
+    print(f"[OK] Vaga analisada com sucesso: {j.title} ({j.company})")
+    print(f"  -> Classificação: {j.match_level.value} (Score: {score_str})")
+    print(f"  -> Modalidade: {j.work_model} | Localização: {j.location}")
+    print("  -> Pontos Fortes:")
+    if j.strengths:
+        for s in j.strengths:
+            print(f"     + {s}")
+    else:
+        print("     (Nenhum ponto forte identificado)")
+    print("  -> Pontos de Atenção / Lacunas:")
+    if j.gaps:
+        for g in j.gaps:
+            print(f"     - {g}")
+    else:
+        print("     (Nenhuma lacuna crítica observada)")
+    print("  -> Relatório atualizado em: output/oportunidades/resumo_vagas.md")
     return 0
 
 
@@ -370,7 +474,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     jobs_parser = subparsers.add_parser("jobs", help="Operações de descoberta e coleta de vagas")
     jobs_sub = jobs_parser.add_subparsers(dest="jobs_action", required=True)
-    jobs_sub.add_parser("list", help="Listar vagas identificadas")
+    job_list_p = jobs_sub.add_parser("list", help="Listar vagas identificadas")
+    job_list_p.add_argument(
+        "--level",
+        choices=["alta", "media", "baixa"],
+        help="Filtrar vagas por nível mínimo de aderência",
+    )
+    job_list_p.add_argument(
+        "--model",
+        help="Filtrar vagas por modalidade (ex: remoto, hibrido, presencial)",
+    )
+    job_list_p.add_argument(
+        "--ranked",
+        action="store_true",
+        help="Exibir vagas ordenadas pelo ranking de aderência",
+    )
 
     job_search = jobs_sub.add_parser("search", help="Pesquisar vagas no LinkedIn")
     job_search.add_argument(
@@ -418,8 +536,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--salary", default="Não informado", help="Faixa salarial informada"
     )
 
-    job_match = jobs_sub.add_parser("match", help="Analisar aderência de uma vaga")
-    job_match.add_argument("--id", required=True, help="ID da vaga")
+    job_match = jobs_sub.add_parser("match", help="Analisar aderência de uma ou todas as vagas")
+    job_match_grp = job_match.add_mutually_exclusive_group(required=True)
+    job_match_grp.add_argument(
+        "--id", help="ID da vaga a ser analisada (ou 'all' para avaliar todas)"
+    )
+    job_match_grp.add_argument(
+        "--all", action="store_true", help="Avaliar sequencialmente todas as vagas cadastradas"
+    )
+    job_match.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Reavaliar a vaga mesmo se já houver avaliação em cache",
+    )
+    job_match.add_argument(
+        "--offline",
+        action="store_true",
+        help="Forçar avaliação determinística local (sem chamadas à API Gemini)",
+    )
 
     messages_parser = subparsers.add_parser(
         "messages", help="Elaboração de mensagens para revisão humana"
@@ -513,7 +647,18 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "jobs":
             if args.jobs_action == "list":
-                return run_jobs_list()
+                return run_jobs_list(
+                    level_filter=args.level,
+                    model_filter=args.model,
+                    ranked=args.ranked,
+                )
+            if args.jobs_action == "match":
+                return run_jobs_match(
+                    job_id=args.id,
+                    match_all=bool(args.all or (args.id and args.id == "all")),
+                    refresh=args.refresh,
+                    force_offline=args.offline,
+                )
             if args.jobs_action == "search":
                 asyncio.run(
                     research_jobs(

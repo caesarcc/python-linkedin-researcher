@@ -165,11 +165,19 @@ linkedin-researcher companies research --all
 # Pesquisar vagas no LinkedIn por cargo e localização
 linkedin-researcher jobs search --keywords "Assistente Administrativo" --location "Porto Alegre e Região" --limit 5
 
-# Cadastrar vaga por URL direta
+# Cadastrar vaga por URL direta ou manualmente
 linkedin-researcher jobs add-url --url "https://www.linkedin.com/jobs/view/<ID>/"
+linkedin-researcher jobs add --title "Assistente Financeiro" --company "Empresa X" --url "https://..."
 
-# Listar vagas cadastradas
+# Avaliar aderência explicável da vaga em 7 dimensões (com pré-filtro local de exclusão)
+linkedin-researcher jobs match --id <job_id>
+linkedin-researcher jobs match --all
+linkedin-researcher jobs match --all --offline  # força modo 100% determinístico local
+
+# Listar vagas com filtros de nível, modalidade e ranking
 linkedin-researcher jobs list
+linkedin-researcher jobs list --level alta --ranked
+linkedin-researcher jobs list --model remoto
 ```
 
 ---
