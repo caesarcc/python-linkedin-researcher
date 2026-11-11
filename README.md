@@ -213,6 +213,27 @@ linkedin-researcher report --output output/meu_relatorio.md
 
 Os rascunhos detalhados ficam disponíveis tanto na base estruturada `data/contatos.json` quanto em arquivos individuais de fácil leitura e edição em `output/mensagens/<slug-recrutador>.md` (com checklist de verificação humana). O relatório executivo é gerado em `output/relatorio_consolidado.md`.
 
+### 7. Interface Gráfica Web Interativa (Streamlit)
+
+Para uma experiência visual, ágil e intuitiva sem depender exclusivamente de chamadas CLI, inicie a interface web local:
+
+```powershell
+# Iniciar a interface gráfica web e abrir automaticamente no navegador (http://localhost:8501)
+linkedin-researcher web
+
+# Ou especificar porta customizada
+linkedin-researcher web --port 8080
+```
+
+#### Recursos da Interface Web:
+- **📊 Visão Geral & Dashboard:** KPIs em tempo real, resumo do perfil do candidato ativo e botões de disparo de ações rápidas.
+- **🎯 Vagas & Matching:** Filtros visuais por nível de aderência (Alta, Média, Baixa, Descartada), filtros por modalidade (Remoto, Híbrido, Presencial), busca dinâmica por cargo ou empresa, ordenação por score e modal explicativo com pontos fortes e lacunas de cada vaga.
+- **👥 Recrutadores:** Mapeamento de contatos de R&S, confirmação de vínculo com empresa atual e geração de rascunhos com 1 clique.
+- **🏢 Empresas:** Painel corporativo com setores, sedes, websites e páginas no LinkedIn.
+- **✍️ Rascunhos de Mensagens (Human-in-the-Loop):** Editor de texto interativo para refinar rascunhos antes do envio, botões para Aprovar, Rejeitar e Marcar como Enviado no LinkedIn, com checklist de conferência humana.
+- **📑 Relatório Consolidado:** Visualização renderizada do `relatorio_consolidado.md` com botão de download.
+- **⚙️ Sessão & Diagnóstico:** Status da sessão persistente do Playwright, acionamento do Login Manual Assistido e visualizador de logs recentes.
+
 ---
 
 ## 🧪 Testes Automatizados

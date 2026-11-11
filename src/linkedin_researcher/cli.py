@@ -118,7 +118,14 @@ def run_doctor() -> int:
         ),
     ]
 
-    for pkg in ("google-genai", "playwright", "pydantic", "python-dotenv", "pypdf"):
+    for pkg in (
+        "google-genai",
+        "playwright",
+        "pydantic",
+        "python-dotenv",
+        "pypdf",
+        "streamlit",
+    ):
         try:
             ver = pkg_version(pkg)
             checks.append((f"Pacote {pkg}", True, f"v{ver}"))
@@ -519,6 +526,39 @@ def run_report(output_path: Path | None = None) -> int:
     return 0
 
 
+def run_web(port: int = 8501, host: str = "localhost", headless: bool = False) -> int:
+    """Inicia a interface gráfica web em Streamlit."""
+    import subprocess
+
+    app_path = Path(__file__).parent / "web" / "app.py"
+    if not app_path.exists():
+        print(f"[ERRO] Arquivo da interface web não encontrado em: {app_path}")
+        return 1
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "streamlit",
+        "run",
+        str(app_path),
+        "--server.port",
+        str(port),
+        "--server.address",
+        host,
+    ]
+    if headless:
+        cmd.extend(["--server.headless", "true"])
+
+    print(f"\n🚀 Iniciando LinkedIn Researcher Web UI em http://{host}:{port} ...")
+    print("Pressione Ctrl+C para encerrar o servidor web.")
+    try:
+        proc = subprocess.run(cmd)
+        return proc.returncode
+    except KeyboardInterrupt:
+        print("\nServidor web encerrado pelo usuário.")
+        return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="linkedin-researcher",
@@ -741,6 +781,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--output", type=Path, default=None, help="Caminho customizado para o arquivo markdown"
     )
 
+    web_parser = subparsers.add_parser("web", help="Iniciar interface web interativa (Streamlit)")
+    web_parser.add_argument(
+        "--port", type=int, default=8501, help="Porta HTTP do servidor (padrão: 8501)"
+    )
+    web_parser.add_argument(
+        "--host", default="localhost", help="Endereço de rede (padrão: localhost)"
+    )
+    web_parser.add_argument(
+        "--headless", action="store_true", help="Não abrir navegador automaticamente"
+    )
+
     return parser
 
 
@@ -896,6 +947,9 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "report":
             return run_report(output_path=args.output)
+
+        if args.command == "web":
+            return run_web(port=args.port, host=args.host, headless=args.headless)
 
     except ManualInterventionRequiredError as exc:
         print(f"\n[AÇÃO HUMANA NECESSÁRIA] {exc}")
