@@ -59,3 +59,31 @@ def test_run_web_command_invokes_streamlit(tmp_path: Path) -> None:
         assert "127.0.0.1" in cmd_args
         assert "--server.headless" in cmd_args
 
+
+def test_app_config_aliases_for_web_integration(app_config) -> None:
+    """Valida propriedades de compatibilidade em AppConfig usadas pela interface web."""
+    assert app_config.playwright_profile_dir == app_config.user_data_dir
+    assert app_config.curriculum_pdf_path == app_config.curriculum_path
+    assert app_config.additional_info_path == app_config.candidate_additional_info_path
+
+
+def test_developing_with_streamlit_skill_discovery() -> None:
+    """Valida que o utilitário discover.py da skill developing-with-streamlit encontra os docs."""
+    skill_file = (
+        Path(__file__).parent.parent
+        / ".agents"
+        / "skills"
+        / "developing-with-streamlit"
+        / "SKILL.md"
+    )
+    assert skill_file.exists()
+    discover_script = (
+        Path(__file__).parent.parent
+        / ".agents"
+        / "skills"
+        / "developing-with-streamlit"
+        / "scripts"
+        / "discover.py"
+    )
+    assert discover_script.exists()
+

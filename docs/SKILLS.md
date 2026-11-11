@@ -34,6 +34,10 @@ Seguindo o sistema de descoberta automática de customizações do Antigravity (
     │       └── video-recording.md
     └── playwright-python/       # Skill integrada (Playwright Python + playwright-cli)
         └── SKILL.md
+    └── developing-with-streamlit/ # Skill oficial para interfaces Web em Streamlit
+        ├── SKILL.md
+        └── scripts/
+            └── discover.py
 ```
 
 ---
@@ -68,6 +72,11 @@ Seguindo o sistema de descoberta automática de customizações do Antigravity (
   - Uso de `launch_persistent_context` com diretório `.playwright-profile` ignorado pelo Git (junto com `.playwright-cli/`).
   - Locators semânticos resilientes (`get_by_role`, `get_by_label`, `get_by_placeholder`, `get_by_text`), proibição de `networkidle` e de `sleep` para sincronização de DOM.
   - Testes offline em `pytest` com páginas HTML locais e respeito absoluto ao controle humano.
+
+### 2.3. `developing-with-streamlit` (Skill Oficial do Streamlit)
+- **Localização:** [`.agents/skills/developing-with-streamlit/SKILL.md`](../.agents/skills/developing-with-streamlit/SKILL.md)
+- **Origem:** Skill oficial empacotada no Streamlit (>=1.57), com utilitário de descoberta dinâmica `scripts/discover.py` que localiza as referências e documentação bundled em `site-packages/streamlit`.
+- **Finalidade:** Criação, depuração, layouts em abas, estilização de CSS, controle de estado de sessão e performance na interface gráfica interativa do projeto.
 
 ---
 

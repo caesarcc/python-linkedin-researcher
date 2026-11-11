@@ -11,6 +11,7 @@ Todas as *skills*, *rules* e *agents* do workspace seguem o padrão de descobert
 - **Skills (`.agents/skills/`):**
   - [`.agents/skills/playwright-cli/SKILL.md`](.agents/skills/playwright-cli/SKILL.md) — Skill oficial do Playwright Agent CLI (`playwright-cli install --skills=agents`, ref. <https://playwright.dev/agent-cli/skills>) com 10 guias de referência em [`.agents/skills/playwright-cli/references/`](.agents/skills/playwright-cli/references/).
   - [`.agents/skills/playwright-python/SKILL.md`](.agents/skills/playwright-python/SKILL.md) — Skill integrada de automação Playwright Python (`playwright.async_api`) + `playwright-cli` adaptada às regras deste projeto.
+  - [`.agents/skills/developing-with-streamlit/SKILL.md`](.agents/skills/developing-with-streamlit/SKILL.md) — Skill oficial de desenvolvimento com Streamlit para criação, estilização, temas e otimização de interfaces web interativas.
 - **Rules (`.agents/rules/`):**
   - [`.agents/rules/01-project-context-and-ethics.md`](.agents/rules/01-project-context-and-ethics.md)
   - [`.agents/rules/02-playwright-and-linkedin.md`](.agents/rules/02-playwright-and-linkedin.md)

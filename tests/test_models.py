@@ -49,6 +49,7 @@ def test_stage1_project_structure_and_files(project_root: Path, app_config: AppC
         project_root / "docs" / "SKILLS.md",
         project_root / ".agents" / "skills" / "playwright-cli" / "SKILL.md",
         project_root / ".agents" / "skills" / "playwright-python" / "SKILL.md",
+        project_root / ".agents" / "skills" / "developing-with-streamlit" / "SKILL.md",
         project_root / ".agents" / "rules" / "01-project-context-and-ethics.md",
         project_root / ".agents" / "rules" / "02-playwright-and-linkedin.md",
         project_root / ".agents" / "rules" / "03-python-and-architecture.md",

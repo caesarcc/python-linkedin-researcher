@@ -99,6 +99,17 @@ def run_doctor() -> int:
             ".agents/skills/playwright-python/SKILL.md",
         ),
         (
+            "Skill oficial developing-with-streamlit (.agents)",
+            (
+                cfg.project_root
+                / ".agents"
+                / "skills"
+                / "developing-with-streamlit"
+                / "SKILL.md"
+            ).exists(),
+            ".agents/skills/developing-with-streamlit/SKILL.md",
+        ),
+        (
             "Rules padronizadas (.agents/rules)",
             (cfg.project_root / ".agents" / "rules").exists(),
             ".agents/rules/",

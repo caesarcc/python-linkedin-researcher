@@ -86,6 +86,21 @@ class AppConfig:
     def contacts_template_file(self) -> Path:
         return self.data_dir / "contatos.template.json"
 
+    @property
+    def playwright_profile_dir(self) -> Path:
+        """Alias para user_data_dir (diretório de perfil persistente do Playwright)."""
+        return self.user_data_dir
+
+    @property
+    def curriculum_pdf_path(self) -> Path:
+        """Alias para curriculum_path."""
+        return self.curriculum_path
+
+    @property
+    def additional_info_path(self) -> Path:
+        """Alias para candidate_additional_info_path."""
+        return self.candidate_additional_info_path
+
 
 def validate_curriculum_pdf_extension(path: Path) -> None:
     """Valida se o currículo é estritamente .pdf, rejeitando explicitamente .docx e outros."""
