@@ -53,12 +53,8 @@ from linkedin_researcher.research.recruiter_research import (
 from linkedin_researcher.storage import JsonStorage
 
 
-def run_doctor() -> int:
-    """Valida configuração, diretórios, currículo em PDF, dados e dependências principais."""
-    cfg = load_config()
-    logger = setup_logging(cfg.logs_dir, cfg.log_level)
-    logger.info("Executando diagnóstico do ambiente (doctor)...")
-
+def collect_doctor_checks(cfg: AppConfig) -> list[tuple[str, bool, str]]:
+    """Coleta a lista completa de verificações de ambiente, integridade e dependências."""
     storage = JsonStorage(cfg)
     recruiters = storage.seed_initial_recruiters()
     profile = load_candidate_profile(cfg)
@@ -102,11 +98,7 @@ def run_doctor() -> int:
         (
             "Skill oficial developing-with-streamlit (.agents)",
             (
-                cfg.project_root
-                / ".agents"
-                / "skills"
-                / "developing-with-streamlit"
-                / "SKILL.md"
+                cfg.project_root / ".agents" / "skills" / "developing-with-streamlit" / "SKILL.md"
             ).exists(),
             ".agents/skills/developing-with-streamlit/SKILL.md",
         ),
@@ -150,6 +142,17 @@ def run_doctor() -> int:
             checks.append((f"Pacote {pkg}", True, f"v{ver}"))
         except Exception as exc:  # pragma: no cover
             checks.append((f"Pacote {pkg}", False, str(exc)))
+
+    return checks
+
+
+def run_doctor() -> int:
+    """Valida configuração, diretórios, currículo em PDF, dados e dependências principais."""
+    cfg = load_config()
+    logger = setup_logging(cfg.logs_dir, cfg.log_level)
+    logger.info("Executando diagnóstico do ambiente (doctor)...")
+
+    checks = collect_doctor_checks(cfg)
 
     all_ok = True
     print("\n=== Diagnóstico LinkedIn Researcher (doctor) ===")
@@ -433,7 +436,7 @@ def run_messages_list(recruiter_id: str | None = None) -> int:
         print(f"- [{m.id}] Destinatário: {rec_name} ({m.recruiter_id})")
         print(f"  Status de Revisão: {m.review_status.value} | Enviada manualmente: {sent_info}")
         print(f"  Contexto: {m.context}")
-        print(f"  Prévia: \"{preview}\"")
+        print(f'  Prévia: "{preview}"')
         print(f"  Arquivo Markdown: output/mensagens/{slug}.md\n")
     return 0
 
@@ -649,9 +652,7 @@ def run_web(
             _write_stdout_safe(msg)
             web_log.write(f"[{end_ts}] {msg.strip()}\n")
             web_log.flush()
-            app_log.write(
-                f"{end_ts} | INFO     | linkedin_researcher.web | {msg.strip()}\n"
-            )
+            app_log.write(f"{end_ts} | INFO     | linkedin_researcher.web | {msg.strip()}\n")
             app_log.flush()
             if proc.poll() is None:
                 proc.terminate()
@@ -806,12 +807,8 @@ def build_parser() -> argparse.ArgumentParser:
     job_add = jobs_sub.add_parser("add", help="Registrar manualmente uma vaga")
     job_add.add_argument("--title", required=True, help="Título da vaga")
     job_add.add_argument("--company", required=True, help="Nome da empresa")
-    job_add.add_argument(
-        "--url", required=True, help="URL da vaga para candidatura/consulta"
-    )
-    job_add.add_argument(
-        "--location", default="a confirmar", help="Localização"
-    )
+    job_add.add_argument("--url", required=True, help="URL da vaga para candidatura/consulta")
+    job_add.add_argument("--location", default="a confirmar", help="Localização")
     job_add.add_argument(
         "--model",
         default="a confirmar",
@@ -822,9 +819,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="a confirmar",
         help="Tipo de contratação (CLT, PJ)",
     )
-    job_add.add_argument(
-        "--salary", default="Não informado", help="Faixa salarial informada"
-    )
+    job_add.add_argument("--salary", default="Não informado", help="Faixa salarial informada")
 
     job_match = jobs_sub.add_parser("match", help="Analisar aderência de uma ou todas as vagas")
     job_match_grp = job_match.add_mutually_exclusive_group(required=True)
@@ -852,9 +847,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     msg_draft = messages_sub.add_parser("draft", help="Gerar rascunho de mensagem para revisão")
     msg_draft_grp = msg_draft.add_mutually_exclusive_group(required=True)
-    msg_draft_grp.add_argument(
-        "--recruiter-id", help="ID do recrutador (ou 'all' para todos)"
-    )
+    msg_draft_grp.add_argument("--recruiter-id", help="ID do recrutador (ou 'all' para todos)")
     msg_draft_grp.add_argument(
         "--all", action="store_true", help="Gerar rascunhos para todos os recrutadores cadastrados"
     )
@@ -863,7 +856,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--refresh", action="store_true", help="Forçar nova geração ignorando cache"
     )
     msg_draft.add_argument(
-        "--offline", action="store_true", help="Forçar geração determinística local (sem LLM/Ollama/Gemini)"
+        "--offline", action="store_true", help="Forçar determinístico (sem LLM/Ollama/Gemini)"
     )
 
     msg_list = messages_sub.add_parser("list", help="Listar mensagens e rascunhos gerados")
