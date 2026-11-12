@@ -14,7 +14,6 @@ from pydantic import BaseModel, Field
 from linkedin_researcher.analysis.curriculum_profile import (
     build_profile_and_recruiters_from_cv_and_md,
     load_candidate_profile,
-    save_candidate_profile,
 )
 from linkedin_researcher.analysis.job_matching import match_all_jobs, match_job
 from linkedin_researcher.analysis.ranking import rank_jobs
@@ -184,7 +183,9 @@ def render_sidebar(cfg: AppConfig, storage: JsonStorage) -> str:
 
     if cfg.llm_provider == "ollama":
         provider = get_llm_provider(cfg)
-        ollama_status = "🟢 Conectado" if provider.is_available() else "⚪ Offline / Execute 'ollama pull'"
+        ollama_status = (
+            "🟢 Conectado" if provider.is_available() else "⚪ Offline / Execute 'ollama pull'"
+        )  # noqa: E501
         st.sidebar.markdown(f"**LLM Local (Ollama):** {ollama_status}")
         st.sidebar.caption(f"Modelo: `{cfg.ollama_model}`")
     elif cfg.llm_provider == "gemini":
@@ -566,12 +567,14 @@ def render_recruiters_tab(cfg: AppConfig, storage: JsonStorage) -> None:
     storage.seed_initial_recruiters()
     recruiters = storage.list_recruiters()
 
-    tab_list, tab_research, tab_edit, tab_add = st.tabs([
-        "👥 Lista de Recrutadores",
-        "🔍 Pesquisar no LinkedIn (Playwright)",
-        "✏️ Atualizar Dados / URL",
-        "➕ Cadastrar Manualmente",
-    ])
+    tab_list, tab_research, tab_edit, tab_add = st.tabs(
+        [
+            "👥 Lista de Recrutadores",
+            "🔍 Pesquisar no LinkedIn (Playwright)",
+            "✏️ Atualizar Dados / URL",
+            "➕ Cadastrar Manualmente",
+        ]
+    )
 
     with tab_list:
         st.write(f"Total de recrutadores cadastrados: **{len(recruiters)}**")
@@ -621,7 +624,9 @@ def render_recruiters_tab(cfg: AppConfig, storage: JsonStorage) -> None:
                                 )
                                 if updated_list:
                                     u = updated_list[0]
-                                    st.success(f"Recrutador {u.name} atualizado! Empresa: {u.current_company}")
+                                    st.success(
+                                        f"Recrutador {u.name} atualizado! Empresa: {u.current_company}"  # noqa: E501
+                                    )  # noqa: E501
                                     st.rerun()
                                 else:
                                     st.warning("Pesquisa concluída sem alterações.")
@@ -631,12 +636,14 @@ def render_recruiters_tab(cfg: AppConfig, storage: JsonStorage) -> None:
     with tab_research:
         st.subheader("Pesquisar Recrutadores no LinkedIn (Playwright)")
         st.info(
-            "Pesquisa o perfil dos recrutadores no LinkedIn para identificar e confirmar a empresa atual, "
+            "Pesquisa perfil dos recrutadores para identificar e confirmar a empresa atual, "
             "cargo e foco de recrutamento. Requer sessão autenticada em .playwright-profile/."
         )
 
         rec_options = ["Todos os Recrutadores"] + [f"{r.name} ({r.id})" for r in recruiters]
-        selected_rec_target = st.selectbox("Selecione o Recrutador:", rec_options, key="res_rec_select")
+        selected_rec_target = st.selectbox(
+            "Selecione o Recrutador:", rec_options, key="res_rec_select"
+        )
 
         if st.button("🚀 Iniciar Pesquisa no LinkedIn", key="btn_start_res_rec", width="stretch"):
             with st.spinner("Executando automação Playwright para pesquisar perfil(is)..."):
@@ -655,7 +662,9 @@ def render_recruiters_tab(cfg: AppConfig, storage: JsonStorage) -> None:
 
     with tab_edit:
         st.subheader("Atualizar Dados e URL do Recrutador")
-        st.caption("Permite atualizar manualmente a URL do LinkedIn (set-url) ou confirmar vínculo de empresa (update).")
+        st.caption(
+            "Permite atualizar manualmente a URL do LinkedIn ou confirmar vínculo de empresa."
+        )
 
         if not recruiters:
             st.info("Nenhum recrutador disponível para edição.")
@@ -668,9 +677,13 @@ def render_recruiters_tab(cfg: AppConfig, storage: JsonStorage) -> None:
 
             if sel_rec:
                 with st.form("edit_recruiter_form"):
-                    e_url = st.text_input("URL do Perfil no LinkedIn (set-url):", value=sel_rec.linkedin_url or "")
+                    e_url = st.text_input(
+                        "URL do Perfil no LinkedIn (set-url):", value=sel_rec.linkedin_url or ""
+                    )
                     e_comp = st.text_input("Empresa Atual:", value=sel_rec.current_company)
-                    e_verified = st.checkbox("Vínculo com Empresa Confirmado?", value=sel_rec.company_verified)
+                    e_verified = st.checkbox(
+                        "Vínculo com Empresa Confirmado?", value=sel_rec.company_verified
+                    )
                     e_title = st.text_input("Título / Cargo Atual:", value=sel_rec.current_title)
                     e_loc = st.text_input("Localização:", value=sel_rec.location)
                     e_notes = st.text_area("Observações / Contexto:", value=sel_rec.notes or "")
@@ -736,11 +749,13 @@ def render_companies_tab(cfg: AppConfig, storage: JsonStorage) -> None:
 
     companies = storage.list_companies()
 
-    tab_comp_list, tab_comp_research, tab_comp_add = st.tabs([
-        "🏢 Empresas Mapeadas",
-        "🔍 Pesquisar no LinkedIn (Playwright)",
-        "➕ Cadastrar Empresa Manualmente",
-    ])
+    tab_comp_list, tab_comp_research, tab_comp_add = st.tabs(
+        [
+            "🏢 Empresas Mapeadas",
+            "🔍 Pesquisar no LinkedIn (Playwright)",
+            "➕ Cadastrar Empresa Manualmente",
+        ]
+    )
 
     with tab_comp_list:
         st.write(f"Total de empresas cadastradas: **{len(companies)}**")
@@ -783,10 +798,14 @@ def render_companies_tab(cfg: AppConfig, storage: JsonStorage) -> None:
         )
 
         comp_options = ["Todas as Empresas"] + [f"{c.name} ({c.id})" for c in companies]
-        selected_comp_target = st.selectbox("Selecione a Empresa:", comp_options, key="res_comp_select")
+        selected_comp_target = st.selectbox(
+            "Selecione a Empresa:", comp_options, key="res_comp_select"
+        )
 
         if st.button("🚀 Iniciar Pesquisa de Empresas", key="btn_start_res_comp", width="stretch"):
-            with st.spinner("Executando automação Playwright para pesquisar página(s) de empresa..."):
+            with st.spinner(
+                "Executando automação Playwright para pesquisar página(s) de empresa..."
+            ):
                 try:
                     if selected_comp_target == "Todas as Empresas":
                         results = asyncio.run(research_companies(cfg, research_all=True))
@@ -808,7 +827,9 @@ def render_companies_tab(cfg: AppConfig, storage: JsonStorage) -> None:
             nc_loc = st.text_input("Sede / Localização", value="Porto Alegre, RS")
             nc_web = st.text_input("Website Oficial (URL)")
             nc_li = st.text_input("URL da Página no LinkedIn (URL)")
-            nc_model = st.selectbox("Modelo de Trabalho", ["Híbrido", "Remoto", "Presencial", "a confirmar"])
+            nc_model = st.selectbox(
+                "Modelo de Trabalho", ["Híbrido", "Remoto", "Presencial", "a confirmar"]
+            )
             nc_desc = st.text_area("Descrição Institucional")
             sub_comp = st.form_submit_button("Salvar Empresa")
 
@@ -852,27 +873,39 @@ def render_messages_tab(cfg: AppConfig, storage: JsonStorage) -> None:
     jobs = storage.list_jobs()
     recruiter_map = {r.id: r for r in recruiters}
 
-    tab_review, tab_generate = st.tabs([
-        "📝 Revisão e Edição de Rascunhos",
-        "✨ Gerar Novos Rascunhos",
-    ])
+    tab_review, tab_generate = st.tabs(
+        [
+            "📝 Revisão e Edição de Rascunhos",
+            "✨ Gerar Novos Rascunhos",
+        ]
+    )
 
     with tab_generate:
         st.subheader("Gerar Novos Rascunhos de Mensagem")
-        st.caption("Crie abordagens personalizadas baseadas no currículo comprovado e contexto do recrutador/vaga.")
+        st.caption(
+            "Crie abordagens personalizadas baseadas no currículo e contexto do recrutador/vaga."
+        )
 
         col_g1, col_g2 = st.columns(2)
         rec_choices = ["Todos os Recrutadores"] + [f"{r.name} ({r.id})" for r in recruiters]
-        sel_rec_target = col_g1.selectbox("Destinatário (Recrutador):", rec_choices, key="gen_msg_rec")
+        sel_rec_target = col_g1.selectbox(
+            "Destinatário (Recrutador):", rec_choices, key="gen_msg_rec"
+        )
 
         job_choices = ["Nenhuma vaga vinculada (Abordagem Espontânea/Geral)"] + [
             f"{j.title} — {j.company} ({j.id})" for j in jobs
         ]
-        sel_job_target = col_g2.selectbox("Vincular a Vaga Específica (Opcional):", job_choices, key="gen_msg_job")
+        sel_job_target = col_g2.selectbox(
+            "Vincular a Vaga Específica (Opcional):", job_choices, key="gen_msg_job"
+        )
 
         col_opt1, col_opt2, col_opt3 = st.columns([1.5, 1.5, 2])
-        gen_refresh = col_opt1.checkbox("🔄 Forçar regeração (--refresh)", value=True, key="gen_msg_refresh")
-        gen_offline = col_opt2.checkbox("⚡ Forçar offline determinístico (--offline)", value=False, key="gen_msg_offline")
+        gen_refresh = col_opt1.checkbox(
+            "🔄 Forçar regeração (--refresh)", value=True, key="gen_msg_refresh"
+        )
+        gen_offline = col_opt2.checkbox(
+            "⚡ Forçar offline determinístico (--offline)", value=False, key="gen_msg_offline"
+        )
         gen_provider_choice = col_opt3.selectbox(
             "Provedor LLM:",
             ["Padrão (.env)", "Ollama (Local)", "Gemini (Nuvem)", "Offline (Regras Locais)"],
@@ -945,7 +978,9 @@ def render_messages_tab(cfg: AppConfig, storage: JsonStorage) -> None:
                 options.append(label)
                 msg_dict[label] = m
 
-            selected_label = st.selectbox("Selecione o Rascunho para Revisar:", options, key="rev_msg_select")
+            selected_label = st.selectbox(
+                "Selecione o Rascunho para Revisar:", options, key="rev_msg_select"
+            )
             selected_msg = msg_dict[selected_label]
             recruiter = recruiter_map.get(selected_msg.recruiter_id)
 
@@ -977,7 +1012,9 @@ def render_messages_tab(cfg: AppConfig, storage: JsonStorage) -> None:
                     st.warning("Rascunho marcado como Descartado.")
                     st.rerun()
 
-                if st.button("🚀 Marcar como Enviado no LinkedIn", key="btn_sent_msg", width="stretch"):
+                if st.button(
+                    "🚀 Marcar como Enviado no LinkedIn", key="btn_sent_msg", width="stretch"
+                ):
                     review_message(cfg, selected_msg.id, mark_sent=True)
                     st.success("Registrado como enviado manualmente pelo usuário!")
                     st.rerun()
@@ -998,7 +1035,11 @@ def render_messages_tab(cfg: AppConfig, storage: JsonStorage) -> None:
             st.divider()
 
             st.markdown("#### ✅ Checklist de Conferência")
-            st.checkbox("O tom da mensagem reflete meu estilo pessoal de comunicação.", value=True, key="chk_tone")
+            st.checkbox(
+                "O tom da mensagem reflete meu estilo pessoal de comunicação.",
+                value=True,
+                key="chk_tone",
+            )
             st.checkbox(
                 "As competências citadas representam com fidelidade a experiência comprovada.",
                 value=True,
@@ -1063,13 +1104,15 @@ def render_settings_tab(cfg: AppConfig, storage: JsonStorage) -> None:
         unsafe_allow_html=True,
     )
 
-    t1, t2, t3, t4, t5 = st.tabs([
-        "🌐 Sessão LinkedIn",
-        "🩺 Diagnóstico (Doctor)",
-        "🤖 Teste de LLM",
-        "👤 Perfil do Candidato",
-        "📄 Logs",
-    ])
+    t1, t2, t3, t4, t5 = st.tabs(
+        [
+            "🌐 Sessão LinkedIn",
+            "🩺 Diagnóstico (Doctor)",
+            "🤖 Teste de LLM",
+            "👤 Perfil do Candidato",
+            "📄 Logs",
+        ]
+    )
 
     with t1:
         st.subheader("Sessão Persistente do Playwright")
@@ -1107,7 +1150,7 @@ def render_settings_tab(cfg: AppConfig, storage: JsonStorage) -> None:
 
     with t2:
         st.subheader("🩺 Diagnóstico do Ambiente (Doctor)")
-        st.write("Verificação completa de dependências, integridade dos arquivos e conectividade do sistema:")
+        st.write("Verificação completa de dependências, integridade de arquivos e conectividade:")
 
         if st.button("🩺 Executar Diagnóstico Completo", width="stretch", key="btn_run_doctor"):
             checks = collect_doctor_checks(cfg)
@@ -1132,17 +1175,26 @@ def render_settings_tab(cfg: AppConfig, storage: JsonStorage) -> None:
         st.subheader("🤖 Teste de LLM e Benchmarking em Tempo Real")
         st.markdown(f"**Provedor Padrão Configurado (.env):** `{cfg.llm_provider}`")
         if cfg.llm_provider == "ollama":
-            st.markdown(f"**Modelo Ollama:** `{cfg.ollama_model}` | **Endpoint:** `{cfg.ollama_base_url}`")
+            st.markdown(
+                f"**Modelo Ollama:** `{cfg.ollama_model}` | **Endpoint:** `{cfg.ollama_base_url}`"
+            )
         elif cfg.llm_provider == "gemini":
             st.markdown(f"**Modelo Gemini:** `{cfg.gemini_model}`")
 
         llm_test_choice = st.selectbox(
             "Provedor a ser testado:",
-            ["Provedor Atual (.env)", "Ollama (Local)", "Gemini (Nuvem)", "Offline (Determinístico)"],
+            [
+                "Provedor Atual (.env)",
+                "Ollama (Local)",
+                "Gemini (Nuvem)",
+                "Offline (Determinístico)",
+            ],
             key="settings_llm_choice",
         )
 
-        if st.button("🧪 Testar Resposta do LLM em Tempo Real", width="stretch", key="btn_test_llm_ping"):
+        if st.button(
+            "🧪 Testar Resposta do LLM em Tempo Real", width="stretch", key="btn_test_llm_ping"
+        ):
             override = None
             if llm_test_choice == "Ollama (Local)":
                 override = "ollama"
@@ -1151,16 +1203,25 @@ def render_settings_tab(cfg: AppConfig, storage: JsonStorage) -> None:
             elif llm_test_choice == "Offline (Determinístico)":
                 override = "offline"
 
-            target_provider = get_llm_provider(cfg, provider_override=override) if override else get_llm_provider(cfg)
+            target_provider = (
+                get_llm_provider(cfg, provider_override=override)
+                if override
+                else get_llm_provider(cfg)
+            )
 
             st.write(f"Iniciando chamada para: `{target_provider.name}`...")
             if not target_provider.is_available():
                 st.error(f"❌ O provedor `{target_provider.name}` não está disponível ou offline.")
             else:
+
                 class PingTestSchema(BaseModel):
                     status: str = Field(description="Deve ser 'OK'")
-                    model_response: str = Field(description="Uma mensagem curta de validação em português")
-                    latency_evaluation: str = Field(description="Avaliação breve sobre velocidade/resposta")
+                    model_response: str = Field(
+                        description="Uma mensagem curta de validação em português"
+                    )
+                    latency_evaluation: str = Field(
+                        description="Avaliação breve sobre velocidade/resposta"
+                    )
 
                 prompt = (
                     "Responda a este teste de conectividade estruturada em JSON.\n"
@@ -1175,54 +1236,84 @@ def render_settings_tab(cfg: AppConfig, storage: JsonStorage) -> None:
                 elapsed = time.perf_counter() - t0
 
                 if res:
-                    st.success(f"✅ Sucesso! Inferência concluída em **{elapsed:.2f}s** via `{target_provider.name}`.")
+                    st.success(
+                        f"✅ Sucesso! Inferência concluída em **{elapsed:.2f}s** via `{target_provider.name}`."  # noqa: E501
+                    )
                     with st.container(border=True):
                         st.json(res.model_dump())
                 else:
-                    st.warning(f"O provedor `{target_provider.name}` não retornou schema válido em {elapsed:.2f}s.")
+                    st.warning(
+                        f"O provedor `{target_provider.name}` não retornou schema válido em {elapsed:.2f}s."  # noqa: E501
+                    )
 
     with t4:
         st.subheader("👤 Perfil do Candidato Ativo (Profile Management)")
-        profile = safe_load_candidate_profile(cfg)
+        safe_load_candidate_profile(cfg)
 
         col_p1, col_p2 = st.columns(2)
         with col_p1:
             st.markdown(f"**Arquivo de Perfil:** `{cfg.candidate_profile_file.name}`")
-            st.markdown(f"Status: {'🟢 Presente' if cfg.candidate_profile_file.exists() else '⚪ Não encontrado'}")
+            st.markdown(
+                f"Status: {'🟢 Presente' if cfg.candidate_profile_file.exists() else '⚪ Não encontrado'}"  # noqa: E501
+            )
 
-            st.markdown(f"**Currículo em PDF:** `{cfg.curriculum_path.name if cfg.curriculum_path else 'Não informado'}`")
-            st.markdown(f"Status: {'🟢 Presente' if cfg.curriculum_path and cfg.curriculum_path.exists() else '⚪ Não encontrado'}")
+            st.markdown(
+                f"**Currículo em PDF:** `{cfg.curriculum_path.name if cfg.curriculum_path else 'Não informado'}`"  # noqa: E501
+            )
+            st.markdown(
+                f"Status: {'🟢 Presente' if cfg.curriculum_path and cfg.curriculum_path.exists() else '⚪ Não encontrado'}"  # noqa: E501
+            )
 
         with col_p2:
             st.markdown(f"**Informações Adicionais:** `{cfg.candidate_additional_info_file.name}`")
-            st.markdown(f"Status: {'🟢 Presente' if cfg.candidate_additional_info_file.exists() else '⚪ Não encontrado'}")
+            st.markdown(
+                f"Status: {'🟢 Presente' if cfg.candidate_additional_info_file.exists() else '⚪ Não encontrado'}"  # noqa: E501
+            )
 
         st.divider()
 
         col_pb1, col_pb2 = st.columns(2)
         with col_pb1:
-            if st.button("🔄 Reconstruir Perfil (profile build)", width="stretch", key="btn_build_profile_settings"):
+            if st.button(
+                "🔄 Reconstruir Perfil (profile build)",
+                width="stretch",
+                key="btn_build_profile_settings",
+            ):
                 with st.spinner("Construindo perfil a partir do PDF e MD..."):
                     try:
                         p, recs = build_profile_and_recruiters_from_cv_and_md(
                             pdf_path=cfg.curriculum_path,
-                            md_path=cfg.candidate_additional_info_file if cfg.candidate_additional_info_file.exists() else None,
+                            md_path=cfg.candidate_additional_info_file
+                            if cfg.candidate_additional_info_file.exists()
+                            else None,
                             config=cfg,
                         )
-                        st.success(f"Perfil reconstruído com sucesso! {len(recs)} recrutadores extraídos.")
+                        st.success(
+                            f"Perfil reconstruído com sucesso! {len(recs)} recrutadores extraídos."
+                        )
                         st.rerun()
                     except Exception as e:
                         st.error(f"Erro ao reconstruir perfil: {e}")
 
         with col_pb2:
-            if st.button("📄 Inicializar Templates (profile init)", width="stretch", key="btn_init_profile_settings"):
+            if st.button(
+                "📄 Inicializar Templates (profile init)",
+                width="stretch",
+                key="btn_init_profile_settings",
+            ):
                 try:
-                    if not cfg.candidate_profile_file.exists() and cfg.candidate_profile_template_file.exists():
+                    if (
+                        not cfg.candidate_profile_file.exists()
+                        and cfg.candidate_profile_template_file.exists()
+                    ):
                         cfg.candidate_profile_file.write_text(
                             cfg.candidate_profile_template_file.read_text(encoding="utf-8"),
                             encoding="utf-8",
                         )
-                    if not cfg.candidate_additional_info_file.exists() and cfg.candidate_additional_info_template_file.exists():
+                    if (
+                        not cfg.candidate_additional_info_file.exists()
+                        and cfg.candidate_additional_info_template_file.exists()
+                    ):
                         cfg.candidate_additional_info_file.write_text(
                             cfg.candidate_additional_info_template_file.read_text(encoding="utf-8"),
                             encoding="utf-8",

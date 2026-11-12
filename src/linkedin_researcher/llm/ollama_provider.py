@@ -7,8 +7,6 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
-from linkedin_researcher.llm.protocol import LLMProvider
-
 logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
@@ -117,13 +115,13 @@ class OllamaProvider:
                 content = response["message"].get("content", "")
 
             if not content:
-                logger.warning("Resposta vazia retornada pelo Ollama para o modelo '%s'.", self._model)
+                logger.warning("Resposta vazia do Ollama para o modelo '%s'.", self._model)
                 return None
 
             return schema.model_validate_json(content)
         except Exception as exc:
             logger.warning(
-                "Falha na inferência estruturada via Ollama (%s: %s). Ativando fallback determinístico.",
+                "Falha na inferência via Ollama (%s: %s). Ativando fallback determinístico.",
                 self._model,
                 exc,
             )

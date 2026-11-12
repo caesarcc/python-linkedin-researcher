@@ -17,7 +17,6 @@ Princípios invioláveis:
 from __future__ import annotations
 
 import logging
-import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -75,9 +74,7 @@ def generate_deterministic_draft(
     primary_roles = (
         ", ".join(profile.target_roles_primary[:2]) or "área administrativa e financeira"
     )
-    key_skills = (
-        ", ".join(profile.proven_competencies[:3]) or "rotinas administrativas e controles"
-    )
+    key_skills = ", ".join(profile.proven_competencies[:3]) or "rotinas administrativas e controles"
 
     # Caso 1: Vaga específica informada
     if job is not None:
@@ -423,13 +420,13 @@ def generate_all_drafts(
     provider = llm_provider
     if provider is None and not force_offline:
         if client is not None:
-            provider = get_llm_provider(
-                config, provider_override="gemini", client_override=client
-            )
+            provider = get_llm_provider(config, provider_override="gemini", client_override=client)
         else:
             provider = get_llm_provider(config)
 
-    max_calls = getattr(config, "llm_max_calls_per_run", getattr(config, "gemini_max_calls_per_run", 5))
+    max_calls = getattr(
+        config, "llm_max_calls_per_run", getattr(config, "gemini_max_calls_per_run", 5)
+    )  # noqa: E501
 
     for r in recruiters:
         msg_id = f"msg-{r.id}"
@@ -543,9 +540,7 @@ def generate_consolidated_report(config: AppConfig, output_path: Path | None = N
         "",
         f"## 2. Oportunidades Identificadas e Ranqueadas ({len(ranked_jobs)})",
         "",
-        (
-            "| ID | Vaga | Empresa | Local | Modalidade | Contratação | Aderência | Score |"
-        ),
+        ("| ID | Vaga | Empresa | Local | Modalidade | Contratação | Aderência | Score |"),
         "| :--- | :--- | :--- | :--- | :--- | :--- | :---: | :---: |",
     ]
 
@@ -578,9 +573,7 @@ def generate_consolidated_report(config: AppConfig, output_path: Path | None = N
             "",
             f"## 3. Mapeamento de Recrutadores e Contatos ({len(recruiters)})",
             "",
-            (
-                "| ID | Nome | Empresa Atual | Vínculo | Local | Foco de Recrutamento | Perfil |"
-            ),
+            ("| ID | Nome | Empresa Atual | Vínculo | Local | Foco de Recrutamento | Perfil |"),
             "| :--- | :--- | :--- | :---: | :--- | :--- | :---: |",
         ]
     )

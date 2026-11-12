@@ -12,7 +12,6 @@ coletadas, combinando:
 from __future__ import annotations
 
 import logging
-import os
 import re
 import unicodedata
 from typing import Any
@@ -108,9 +107,7 @@ def _score_title_and_scope(
             return 26.0, strengths, gaps
 
     # 3. Áreas de prioridade (ex: Administrativo, Financeiro, Operações)
-    combined_desc = _clean_token(
-        f"{job.title} {job.description} {' '.join(job.responsibilities)}"
-    )
+    combined_desc = _clean_token(f"{job.title} {job.description} {' '.join(job.responsibilities)}")
     matched_areas: list[str] = []
     for area in profile.priority_areas:
         area_clean = _clean_token(area)
@@ -118,9 +115,7 @@ def _score_title_and_scope(
             matched_areas.append(area)
 
     if matched_areas:
-        strengths.append(
-            f"Área funcional compatível com histórico: {', '.join(matched_areas)}"
-        )
+        strengths.append(f"Área funcional compatível com histórico: {', '.join(matched_areas)}")
         title_area = any(_clean_token(a) in title_clean for a in matched_areas)
         score = 22.0 if title_area else 15.0
         return score, strengths, gaps
@@ -320,9 +315,7 @@ def _score_contract_and_salary(
     ignored_types = {"a confirmar", "nao informado"}
     if not matched_contract and contract_clean and contract_clean not in ignored_types:
         if "estagio" in contract_clean or "trainee" in contract_clean:
-            gaps.append(
-                f"Contratação ({job.contract_type}) não compatível com perfil pleno/CLT"
-            )
+            gaps.append(f"Contratação ({job.contract_type}) não compatível com perfil pleno/CLT")
             score = 0.0
 
     sal_clean = job.salary_range.casefold()
@@ -580,7 +573,9 @@ def match_all_jobs(
             continue
 
         # Verifica teto de chamadas ao LLM
-        max_calls = getattr(config, "llm_max_calls_per_run", getattr(config, "gemini_max_calls_per_run", 5))
+        max_calls = getattr(
+            config, "llm_max_calls_per_run", getattr(config, "gemini_max_calls_per_run", 5)
+        )  # noqa: E501
         allow_llm = (
             not force_offline
             and provider is not None

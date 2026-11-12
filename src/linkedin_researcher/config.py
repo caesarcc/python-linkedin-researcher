@@ -179,7 +179,9 @@ def load_config(project_root: Path | None = None) -> AppConfig:
     ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").strip()
     ollama_model = os.getenv("OLLAMA_MODEL", "qwen2.5:3b").strip() or "qwen2.5:3b"
     ollama_timeout_sec = float(os.getenv("OLLAMA_TIMEOUT_SEC", "60.0"))
-    llm_max_calls_raw = os.getenv("LLM_MAX_CALLS_PER_RUN") or os.getenv("GEMINI_MAX_CALLS_PER_RUN", "5")
+    llm_max_calls_raw = os.getenv("LLM_MAX_CALLS_PER_RUN") or os.getenv(
+        "GEMINI_MAX_CALLS_PER_RUN", "5"
+    )  # noqa: E501
     llm_max_calls_per_run = max(1, int(llm_max_calls_raw))
 
     return AppConfig(

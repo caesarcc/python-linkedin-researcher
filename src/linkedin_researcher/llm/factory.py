@@ -25,7 +25,9 @@ def get_llm_provider(
 
     Permite injeção de clientes mockados via client_override para testes unitários.
     """
-    selected = (provider_override or (config.llm_provider if config else "ollama")).casefold().strip()
+    selected = (
+        (provider_override or (config.llm_provider if config else "ollama")).casefold().strip()
+    )
 
     if selected == "ollama":
         model = config.ollama_model if config else "qwen2.5:3b"
@@ -55,4 +57,3 @@ def get_llm_provider(
         selected,
     )
     return FallbackOfflineProvider()
-
