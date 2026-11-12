@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import importlib
+import io
+from dataclasses import replace
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from linkedin_researcher.cli import build_parser, run_web
 
@@ -42,14 +44,24 @@ def test_web_cli_parser_registered() -> None:
     assert args.host == "localhost"
 
 
-def test_run_web_command_invokes_streamlit(tmp_path: Path) -> None:
-    """Valida se o comando run_web invoca o subprocesso do Streamlit com os parâmetros corretos."""
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value.returncode = 0
-        code = run_web(port=9000, host="127.0.0.1", headless=True)
+def test_run_web_command_invokes_streamlit(app_config, tmp_path: Path) -> None:
+    """Valida que run_web inicia Streamlit via Popen e espelha toda a saída em arquivos de log."""
+    isolated_cfg = replace(app_config, logs_dir=tmp_path / "logs")
+    simulated_output = (
+        "\x1b[32m2026-11-11 Uvicorn server started on 127.0.0.1:9000\x1b[0m\n"
+        "2026-11-11 Uncaught app execution\n"
+        "AttributeError: ALTA\n"
+    )
+    mock_proc = MagicMock()
+    mock_proc.stdout = io.StringIO(simulated_output)
+    mock_proc.wait.return_value = 0
+    mock_proc.poll.return_value = 0
+
+    with patch("subprocess.Popen", return_value=mock_proc) as mock_popen:
+        code = run_web(port=9000, host="127.0.0.1", headless=True, config=isolated_cfg)
         assert code == 0
-        assert mock_run.called
-        cmd_args = mock_run.call_args[0][0]
+        assert mock_popen.called
+        cmd_args = mock_popen.call_args[0][0]
         assert "-m" in cmd_args
         assert "streamlit" in cmd_args
         assert "run" in cmd_args
@@ -58,6 +70,23 @@ def test_run_web_command_invokes_streamlit(tmp_path: Path) -> None:
         assert "--server.address" in cmd_args
         assert "127.0.0.1" in cmd_args
         assert "--server.headless" in cmd_args
+        kwargs = mock_popen.call_args[1]
+        assert kwargs["env"]["PYTHONUNBUFFERED"] == "1"
+
+    web_log = isolated_cfg.logs_dir / "web_server.log"
+    app_log = isolated_cfg.logs_dir / "linkedin_researcher.log"
+    assert web_log.exists()
+    assert app_log.exists()
+
+    web_text = web_log.read_text(encoding="utf-8")
+    assert "Uvicorn server started on 127.0.0.1:9000" in web_text
+    assert "\x1b[32m" not in web_text
+    assert "Uncaught app execution" in web_text
+    assert "AttributeError: ALTA" in web_text
+
+    app_text = app_log.read_text(encoding="utf-8")
+    assert "[WEB] 2026-11-11 Uncaught app execution" in app_text
+    assert "[WEB] AttributeError: ALTA" in app_text
 
 
 def test_app_config_aliases_for_web_integration(app_config) -> None:

@@ -27,7 +27,7 @@ from linkedin_researcher.browser.session_manager import (
     ManualInterventionRequiredError,
     interactive_login,
 )
-from linkedin_researcher.config import load_config
+from linkedin_researcher.config import AppConfig, load_config
 from linkedin_researcher.logging_config import setup_logging
 from linkedin_researcher.messaging.message_generator import (
     generate_all_drafts,
@@ -537,14 +537,46 @@ def run_report(output_path: Path | None = None) -> int:
     return 0
 
 
-def run_web(port: int = 8501, host: str = "localhost", headless: bool = False) -> int:
-    """Inicia a interface gráfica web em Streamlit."""
+_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[mK]")
+
+
+def _strip_ansi(text: str) -> str:
+    """Remove sequências de escape ANSI para manter arquivos de log limpos."""
+    return _ANSI_ESCAPE_RE.sub("", text)
+
+
+def _write_stdout_safe(text: str) -> None:
+    """Escreve texto no stdout preservando fluxo mesmo se encoding do console for limitado."""
+    try:
+        sys.stdout.write(text)
+        sys.stdout.flush()
+    except UnicodeEncodeError:
+        enc = sys.stdout.encoding or "utf-8"
+        safe_text = text.encode(enc, errors="replace").decode(enc, errors="replace")
+        sys.stdout.write(safe_text)
+        sys.stdout.flush()
+
+
+def run_web(
+    port: int = 8501,
+    host: str = "localhost",
+    headless: bool = False,
+    config: AppConfig | None = None,
+) -> int:
+    """Inicia a interface gráfica web em Streamlit e grava toda a saída do terminal em log."""
+    import os
     import subprocess
+    from datetime import datetime
 
     app_path = Path(__file__).parent / "web" / "app.py"
     if not app_path.exists():
         print(f"[ERRO] Arquivo da interface web não encontrado em: {app_path}")
         return 1
+
+    cfg = config or load_config()
+    cfg.logs_dir.mkdir(parents=True, exist_ok=True)
+    web_log_path = cfg.logs_dir / "web_server.log"
+    app_log_path = cfg.logs_dir / "linkedin_researcher.log"
 
     cmd = [
         sys.executable,
@@ -560,14 +592,72 @@ def run_web(port: int = 8501, host: str = "localhost", headless: bool = False) -
     if headless:
         cmd.extend(["--server.headless", "true"])
 
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
+
+    start_ts = datetime.now().isoformat(timespec="seconds")
+    header = (
+        f"\n=== [{start_ts}] Iniciando LinkedIn Researcher Web UI em http://{host}:{port} ===\n"
+    )
     print(f"\n🚀 Iniciando LinkedIn Researcher Web UI em http://{host}:{port} ...")
+    print(f"📝 Logs completos do servidor web: {web_log_path}")
+    print(f"📝 Espelho unificado em: {app_log_path}")
     print("Pressione Ctrl+C para encerrar o servidor web.")
-    try:
-        proc = subprocess.run(cmd)
-        return proc.returncode
-    except KeyboardInterrupt:
-        print("\nServidor web encerrado pelo usuário.")
-        return 0
+
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        bufsize=1,
+        env=env,
+    )
+
+    with (
+        web_log_path.open("a", encoding="utf-8") as web_log,
+        app_log_path.open("a", encoding="utf-8") as app_log,
+    ):
+        web_log.write(header)
+        web_log.flush()
+        app_log.write(f"{start_ts} | INFO     | linkedin_researcher.web | {header.strip()}\n")
+        app_log.flush()
+
+        try:
+            if proc.stdout is not None:
+                for line in proc.stdout:
+                    _write_stdout_safe(line)
+                    clean_line = _strip_ansi(line)
+                    web_log.write(clean_line)
+                    web_log.flush()
+                    app_log.write(f"[WEB] {clean_line}")
+                    app_log.flush()
+            return proc.wait()
+        except KeyboardInterrupt:
+            end_ts = datetime.now().isoformat(timespec="seconds")
+            msg = "\nServidor web encerrado pelo usuário.\n"
+            _write_stdout_safe(msg)
+            web_log.write(f"[{end_ts}] {msg.strip()}\n")
+            web_log.flush()
+            app_log.write(
+                f"{end_ts} | INFO     | linkedin_researcher.web | {msg.strip()}\n"
+            )
+            app_log.flush()
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+            return 0
+        finally:
+            close_fn = getattr(proc.stdout, "close", None)
+            if callable(close_fn):
+                close_fn()
+            if proc.poll() is None:
+                proc.terminate()
 
 
 def build_parser() -> argparse.ArgumentParser:
