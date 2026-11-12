@@ -28,6 +28,7 @@ from linkedin_researcher.browser.session_manager import (
     interactive_login,
 )
 from linkedin_researcher.config import AppConfig, load_config
+from linkedin_researcher.llm import get_llm_provider
 from linkedin_researcher.logging_config import setup_logging
 from linkedin_researcher.messaging.message_generator import (
     generate_all_drafts,
@@ -110,6 +111,11 @@ def run_doctor() -> int:
             ".agents/skills/developing-with-streamlit/SKILL.md",
         ),
         (
+            "Skill oficial ollama (.agents)",
+            (cfg.project_root / ".agents" / "skills" / "ollama" / "SKILL.md").exists(),
+            ".agents/skills/ollama/SKILL.md",
+        ),
+        (
             "Rules padronizadas (.agents/rules)",
             (cfg.project_root / ".agents" / "rules").exists(),
             ".agents/rules/",
@@ -120,17 +126,19 @@ def run_doctor() -> int:
             ".agents/agents/",
         ),
         (
-            "Modelo Gemini padrão configurado",
-            bool(cfg.gemini_model),
+            "Provedor LLM ativo",
+            True,
             (
-                f"{cfg.gemini_model} (max {cfg.gemini_max_calls_per_run} chamadas/execução; "
-                f"GEMINI_API_KEY={'configurada' if cfg.has_gemini_api_key else 'opcional/offline'})"
+                f"Provedor: {cfg.llm_provider.upper()} | Modelo: "
+                f"{cfg.ollama_model if cfg.llm_provider == 'ollama' else cfg.gemini_model} "
+                f"(max {cfg.llm_max_calls_per_run} chamadas/execução)"
             ),
         ),
     ]
 
     for pkg in (
         "google-genai",
+        "ollama",
         "playwright",
         "pydantic",
         "python-dotenv",
@@ -834,7 +842,7 @@ def build_parser() -> argparse.ArgumentParser:
     job_match.add_argument(
         "--offline",
         action="store_true",
-        help="Forçar avaliação determinística local (sem chamadas à API Gemini)",
+        help="Forçar avaliação determinística local (sem chamadas a LLM/Ollama/Gemini)",
     )
 
     messages_parser = subparsers.add_parser(
@@ -855,7 +863,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--refresh", action="store_true", help="Forçar nova geração ignorando cache"
     )
     msg_draft.add_argument(
-        "--offline", action="store_true", help="Forçar geração determinística local (sem Gemini)"
+        "--offline", action="store_true", help="Forçar geração determinística local (sem LLM/Ollama/Gemini)"
     )
 
     msg_list = messages_sub.add_parser("list", help="Listar mensagens e rascunhos gerados")

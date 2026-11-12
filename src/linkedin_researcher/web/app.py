@@ -17,6 +17,7 @@ from linkedin_researcher.analysis.job_matching import match_all_jobs, match_job
 from linkedin_researcher.analysis.ranking import rank_jobs
 from linkedin_researcher.browser.session_manager import interactive_login
 from linkedin_researcher.config import AppConfig, load_config
+from linkedin_researcher.llm import get_llm_provider
 from linkedin_researcher.logging_config import setup_logging
 from linkedin_researcher.messaging.message_generator import (
     generate_all_drafts,
@@ -171,8 +172,17 @@ def render_sidebar(cfg: AppConfig, storage: JsonStorage) -> str:
     session_status = "🟢 Conectada" if has_session else "⚪ Não autenticada"
     st.sidebar.markdown(f"**Sessão LinkedIn:** {session_status}")
 
-    gemini_status = "🟢 Configurada" if cfg.has_gemini_api_key else "⚪ Offline / Sem chave"
-    st.sidebar.markdown(f"**Gemini AI:** {gemini_status}")
+    if cfg.llm_provider == "ollama":
+        provider = get_llm_provider(cfg)
+        ollama_status = "🟢 Conectado" if provider.is_available() else "⚪ Offline / Execute 'ollama pull'"
+        st.sidebar.markdown(f"**LLM Local (Ollama):** {ollama_status}")
+        st.sidebar.caption(f"Modelo: `{cfg.ollama_model}`")
+    elif cfg.llm_provider == "gemini":
+        gemini_status = "🟢 Configurada" if cfg.has_gemini_api_key else "⚪ Offline / Sem chave"
+        st.sidebar.markdown(f"**Gemini AI:** {gemini_status}")
+        st.sidebar.caption(f"Modelo: `{cfg.gemini_model}`")
+    else:
+        st.sidebar.markdown("**LLM:** ⚪ Offline / Regras determinísticas")
 
     st.sidebar.divider()
 

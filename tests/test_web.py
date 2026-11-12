@@ -180,6 +180,7 @@ def test_web_tabs_render_without_errors(app_config, tmp_path: Path) -> None:
         output_dir=tmp_path / "output",
         logs_dir=tmp_path / "logs",
         user_data_dir=tmp_path / "user_data",
+        llm_provider="offline",
     )
     isolated_cfg.output_dir.mkdir(parents=True, exist_ok=True)
     isolated_cfg.logs_dir.mkdir(parents=True, exist_ok=True)

@@ -33,6 +33,11 @@ class AppConfig:
     log_level: str
     candidate_additional_info_path: Path = Path("data/informacoes_adicionais.md")
     browser_channel: str = "chrome"
+    llm_provider: str = "ollama"
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen2.5:3b"
+    ollama_timeout_sec: float = 60.0
+    llm_max_calls_per_run: int = 5
     gemini_enabled: bool = True
     gemini_model: str = "gemini-3.8-flash"
     gemini_max_calls_per_run: int = 5
@@ -170,6 +175,13 @@ def load_config(project_root: Path | None = None) -> AppConfig:
         "LINKEDIN_ADDITIONAL_INFO_PATH", default_add_info
     )
 
+    llm_provider = os.getenv("LLM_PROVIDER", "ollama").strip().lower()
+    ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").strip()
+    ollama_model = os.getenv("OLLAMA_MODEL", "qwen2.5:3b").strip() or "qwen2.5:3b"
+    ollama_timeout_sec = float(os.getenv("OLLAMA_TIMEOUT_SEC", "60.0"))
+    llm_max_calls_raw = os.getenv("LLM_MAX_CALLS_PER_RUN") or os.getenv("GEMINI_MAX_CALLS_PER_RUN", "5")
+    llm_max_calls_per_run = max(1, int(llm_max_calls_raw))
+
     return AppConfig(
         project_root=root,
         user_data_dir=_resolve_path("LINKEDIN_USER_DATA_DIR", root / ".playwright-profile"),
@@ -188,8 +200,13 @@ def load_config(project_root: Path | None = None) -> AppConfig:
         logs_dir=_resolve_path("LINKEDIN_LOGS_DIR", root / "logs"),
         log_level=os.getenv("LINKEDIN_LOG_LEVEL", "INFO").strip().upper(),
         browser_channel=os.getenv("LINKEDIN_BROWSER_CHANNEL", "chrome").strip(),
+        llm_provider=llm_provider,
+        ollama_base_url=ollama_base_url,
+        ollama_model=ollama_model,
+        ollama_timeout_sec=ollama_timeout_sec,
+        llm_max_calls_per_run=llm_max_calls_per_run,
         gemini_enabled=gemini_enabled,
         gemini_model=os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip() or "gemini-3.8-flash",
-        gemini_max_calls_per_run=max(1, int(os.getenv("GEMINI_MAX_CALLS_PER_RUN", "5"))),
+        gemini_max_calls_per_run=llm_max_calls_per_run,
         has_gemini_api_key=bool(gemini_api_key),
     )

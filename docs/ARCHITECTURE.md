@@ -87,12 +87,16 @@ flowchart TD
 ### 3.7. Geração de Mensagens (`messaging/`)
 - `message_generator.py`: Constrói rascunhos personalizados em primeira pessoa combinando networking e interesse em oportunidades, adaptados ao contexto verificado do recrutador. Salva em `output/mensagens/` e em `data/contatos.json` apenas para revisão humana.
 
-### 3.8. Integração Híbrida com Gemini API e Controle de Carga
-- **Modelo padrão:** `gemini-3.8-flash` via SDK oficial `google-genai` (`client.interactions.create` com `store=False` e `response_format` validado por schema Pydantic).
+### 3.8. Arquitetura Desacoplada de Provedores de LLM (`src/linkedin_researcher/llm/`)
+- **Provedor Padrão Local (Ollama):** Inferência 100% privada e local no hardware do usuário (`qwen2.5:3b` recomendado para notebooks com 16 GB RAM / 2 GB VRAM), utilizando structured outputs nativos (`format=schema.model_json_schema()`).
+- **Alternância Simples via Configuração:**
+  - `LLM_PROVIDER=ollama`: execução local sem envio de dados para a nuvem.
+  - `LLM_PROVIDER=gemini`: integração com a Gemini API via SDK `google-genai` (`gemini-3.8-flash` ou `gemini-1.5-pro`).
+  - `LLM_PROVIDER=offline`: regras heurísticas determinísticas locais (0 tokens).
 - **Travas de controle de uso e quota:**
-  1. **Pré-filtro determinístico local (0 tokens):** Cargos de gestão (`Gerente`, `Coordenador`, `Supervisor`) são descartados localmente antes de qualquer chamada à API.
-  2. **Cache persistente em `data/`:** Vagas já analisadas ou rascunhos já gerados não disparam novas chamadas, salvo solicitação explícita (`--refresh`).
-  3. **Teto por execução (`GEMINI_MAX_CALLS_PER_RUN`):** Limita o número máximo de chamadas em uma única execução da CLI (padrão: `5`).
-  4. **Fallback determinístico offline:** Caso `GEMINI_API_KEY` não esteja configurada no `.env` ou `GEMINI_ENABLED=false`, o sistema opera 100% offline com regras locais e templates, permitindo que todos os testes `pytest` rodem sem custo e sem rede.
+  1. **Pré-filtro determinístico local (0 tokens):** Cargos excluídos nas preferências do candidato são descartados localmente antes de qualquer chamada a modelos.
+  2. **Cache persistente em `data/`:** Vagas já analisadas ou rascunhos já gerados não disparam novas inferências, salvo com `--refresh`.
+  3. **Teto por execução (`LLM_MAX_CALLS_PER_RUN`):** Limita o número máximo de chamadas em uma única execução (padrão: `5`).
+  4. **Fallback determinístico offline:** Caso o Ollama esteja offline ou o modelo não tenha sido baixado (ou caso a chave do Gemini não esteja configurada), o sistema opera 100% offline com templates e regras locais, garantindo que testes e comandos CLI nunca quebrem.
 
 

@@ -38,6 +38,8 @@ Seguindo o sistema de descoberta automática de customizações do Antigravity (
         ├── SKILL.md
         └── scripts/
             └── discover.py
+    └── ollama/                  # Skill oficial para inferência e automação local com Ollama
+        └── SKILL.md
 ```
 
 ---
@@ -77,6 +79,12 @@ Seguindo o sistema de descoberta automática de customizações do Antigravity (
 - **Localização:** [`.agents/skills/developing-with-streamlit/SKILL.md`](../.agents/skills/developing-with-streamlit/SKILL.md)
 - **Origem:** Skill oficial empacotada no Streamlit (>=1.57), com utilitário de descoberta dinâmica `scripts/discover.py` que localiza as referências e documentação bundled em `site-packages/streamlit`.
 - **Finalidade:** Criação, depuração, layouts em abas, estilização de CSS, controle de estado de sessão e performance na interface gráfica interativa do projeto.
+
+### 2.4. `ollama` (Skill Oficial para Inferência Local com Ollama)
+- **Localização:** [`.agents/skills/ollama/SKILL.md`](../.agents/skills/ollama/SKILL.md)
+- **Origem:** Criada com base na documentação oficial do Ollama Python (`/ollama/ollama-python`) e Ollama REST API (`/websites/ollama_api`) via **Context7 MCP**.
+- **Versão / Data:** v1.0.0 (2026-11-11)
+- **Finalidade:** Gestão de modelos locais de linguagem (como `qwen2.5:3b`, `llama3.2:3b`), geração com saída estruturada Pydantic (`format=schema.model_json_schema()`), parâmetros otimizados para notebooks com 16 GB de RAM e 2 GB VRAM (`num_ctx`, `temperature: 0.0`), e resiliência offline contra falhas de conexão.
 
 ---
 
