@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -14,7 +13,7 @@ from linkedin_researcher.analysis.curriculum_profile import (
     build_profile_and_recruiters_from_cv_and_md,
     load_candidate_profile,
 )
-from linkedin_researcher.analysis.job_matching import evaluate_job_match, match_all_jobs
+from linkedin_researcher.analysis.job_matching import match_all_jobs, match_job
 from linkedin_researcher.analysis.ranking import rank_jobs
 from linkedin_researcher.browser.session_manager import interactive_login
 from linkedin_researcher.config import AppConfig, load_config
@@ -27,6 +26,7 @@ from linkedin_researcher.messaging.message_generator import (
 )
 from linkedin_researcher.models import (
     CandidateProfile,
+    JobStatus,
     MatchLevel,
     Recruiter,
     ReviewStatus,
@@ -167,12 +167,11 @@ def render_sidebar(cfg: AppConfig, storage: JsonStorage) -> str:
     st.sidebar.divider()
 
     # Diagnósticos rápidos no sidebar
-    has_session = has_persistent_session(cfg.playwright_profile_dir)
+    has_session = has_persistent_session(cfg.user_data_dir)
     session_status = "🟢 Conectada" if has_session else "⚪ Não autenticada"
     st.sidebar.markdown(f"**Sessão LinkedIn:** {session_status}")
 
-    api_key_configured = bool(os.getenv("GEMINI_API_KEY"))
-    gemini_status = "🟢 Configurada" if api_key_configured else "⚪ Offline / Sem chave"
+    gemini_status = "🟢 Configurada" if cfg.has_gemini_api_key else "⚪ Offline / Sem chave"
     st.sidebar.markdown(f"**Gemini AI:** {gemini_status}")
 
     st.sidebar.divider()
@@ -210,8 +209,8 @@ def render_dashboard(cfg: AppConfig, storage: JsonStorage) -> None:
     companies = storage.list_companies()
     messages = storage.list_messages()
 
-    evaluated_jobs = [j for j in jobs if j.match_level is not None]
-    high_match_jobs = [j for j in jobs if j.match_level == MatchLevel.ALTA]
+    evaluated_jobs = [j for j in jobs if j.match_level != MatchLevel.NOT_EVALUATED]
+    high_match_jobs = [j for j in jobs if j.match_level == MatchLevel.HIGH]
     approved_messages = [m for m in messages if m.review_status == ReviewStatus.APPROVED]
     sent_messages = [m for m in messages if m.sent_by_user]
 
@@ -231,18 +230,18 @@ def render_dashboard(cfg: AppConfig, storage: JsonStorage) -> None:
         st.subheader("⚡ Ações Rápidas")
         st.write("Dispare tarefas analíticas para toda a base com um clique:")
 
-        if st.button("📑 Gerar / Atualizar Relatório Consolidado", use_container_width=True):
+        if st.button("📑 Gerar / Atualizar Relatório Consolidado", width="stretch"):
             with st.spinner("Compilando relatório consolidado..."):
                 report_path = generate_consolidated_report(cfg)
                 st.success(f"Relatório gerado em `{report_path}`!")
 
-        if st.button("🎯 Avaliar Aderência de Todas as Vagas", use_container_width=True):
+        if st.button("🎯 Avaliar Aderência de Todas as Vagas", width="stretch"):
             with st.spinner("Executando análise de aderência (7 dimensões)..."):
                 updated = match_all_jobs(cfg, refresh=False, force_offline=False)
                 st.success(f"{len(updated)} vagas avaliadas com sucesso!")
                 st.rerun()
 
-        if st.button("✍️ Gerar Rascunhos para Todos os Recrutadores", use_container_width=True):
+        if st.button("✍️ Gerar Rascunhos para Todos os Recrutadores", width="stretch"):
             with st.spinner("Gerando rascunhos de abordagem para revisão humana..."):
                 drafts = generate_all_drafts(cfg, refresh=False, force_offline=False)
                 st.success(f"{len(drafts)} rascunhos gerados para revisão humana!")
@@ -298,15 +297,15 @@ def render_jobs_tab(cfg: AppConfig, storage: JsonStorage) -> None:
     # Filtragem
     filtered_jobs = jobs
     if level_filter == "Alta":
-        filtered_jobs = [j for j in filtered_jobs if j.match_level == MatchLevel.ALTA]
+        filtered_jobs = [j for j in filtered_jobs if j.match_level == MatchLevel.HIGH]
     elif level_filter == "Média":
-        filtered_jobs = [j for j in filtered_jobs if j.match_level == MatchLevel.MEDIA]
+        filtered_jobs = [j for j in filtered_jobs if j.match_level == MatchLevel.MEDIUM]
     elif level_filter == "Baixa":
-        filtered_jobs = [j for j in filtered_jobs if j.match_level == MatchLevel.BAIXA]
+        filtered_jobs = [j for j in filtered_jobs if j.match_level == MatchLevel.LOW]
     elif level_filter == "Descartada":
-        filtered_jobs = [j for j in filtered_jobs if j.match_level == MatchLevel.DESCARTADA]
+        filtered_jobs = [j for j in filtered_jobs if j.status == JobStatus.DISCARDED]
     elif level_filter == "Não avaliada":
-        filtered_jobs = [j for j in filtered_jobs if j.match_level is None]
+        filtered_jobs = [j for j in filtered_jobs if j.match_level == MatchLevel.NOT_EVALUATED]
 
     if model_filter != "Todas":
         val = model_filter.lower()
@@ -331,7 +330,7 @@ def render_jobs_tab(cfg: AppConfig, storage: JsonStorage) -> None:
         ]
 
     if sort_by_score:
-        filtered_jobs = rank_jobs(filtered_jobs)
+        filtered_jobs = rank_jobs(filtered_jobs, profile)
 
     st.write(f"Exibindo **{len(filtered_jobs)}** de **{len(jobs)}** vagas cadastradas:")
 
@@ -340,34 +339,32 @@ def render_jobs_tab(cfg: AppConfig, storage: JsonStorage) -> None:
         with st.container(border=True):
             col_info, col_match, col_btn = st.columns([3, 1.5, 1.5])
             with col_info:
-                st.markdown(f"### [{job.title}]({job.url})")
+                st.markdown(f"### [{job.title}]({job.application_url})")
                 st.markdown(
                     f"🏢 **{job.company}** &nbsp;|&nbsp; "
                     f"📍 **{job.location or 'Não informada'}** &nbsp;|&nbsp; "
                     f"💼 **{job.work_model or 'A confirmar'}**"
                 )
             with col_match:
-                if job.match_level == MatchLevel.ALTA:
-                    st.markdown(
-                        f'<span class="badge-alta">'
-                        f'🟢 Alta Aderência ({job.match_score}/100)</span>',
-                        unsafe_allow_html=True,
-                    )
-                elif job.match_level == MatchLevel.MEDIA:
-                    st.markdown(
-                        f'<span class="badge-media">'
-                        f'🟡 Média Aderência ({job.match_score}/100)</span>',
-                        unsafe_allow_html=True,
-                    )
-                elif job.match_level == MatchLevel.BAIXA:
-                    st.markdown(
-                        f'<span class="badge-baixa">'
-                        f'🟠 Baixa Aderência ({job.match_score}/100)</span>',
-                        unsafe_allow_html=True,
-                    )
-                elif job.match_level == MatchLevel.DESCARTADA:
+                score_txt = f" ({job.match_score:.0f}/100)" if job.match_score is not None else ""
+                if job.status == JobStatus.DISCARDED:
                     st.markdown(
                         '<span class="badge-descartada">🔴 Descartada</span>',
+                        unsafe_allow_html=True,
+                    )
+                elif job.match_level == MatchLevel.HIGH:
+                    st.markdown(
+                        f'<span class="badge-alta">🟢 Alta Aderência{score_txt}</span>',
+                        unsafe_allow_html=True,
+                    )
+                elif job.match_level == MatchLevel.MEDIUM:
+                    st.markdown(
+                        f'<span class="badge-media">🟡 Média Aderência{score_txt}</span>',
+                        unsafe_allow_html=True,
+                    )
+                elif job.match_level == MatchLevel.LOW:
+                    st.markdown(
+                        f'<span class="badge-baixa">🟠 Baixa Aderência{score_txt}</span>',
                         unsafe_allow_html=True,
                     )
                 else:
@@ -378,24 +375,18 @@ def render_jobs_tab(cfg: AppConfig, storage: JsonStorage) -> None:
 
             with col_btn:
                 btn_key = f"match_btn_{job.id}"
-                if st.button("Avaliar Agora", key=btn_key, use_container_width=True):
+                if st.button("Avaliar Agora", key=btn_key, width="stretch"):
                     with st.spinner(f"Avaliando {job.title}..."):
-                        res = evaluate_job_match(cfg, job, profile, refresh=True)
-                        job.match_level = res.match_level
-                        job.match_score = res.overall_score
-                        job.match_rationale = res.match_rationale
-                        job.strengths = res.strengths
-                        job.gaps = res.gaps
-                        job.evaluated_at = datetime.now().isoformat()
-                        storage.upsert_job(job)
-                        st.toast(f"Vaga avaliada: {res.match_level.value} ({res.overall_score})")
+                        updated = match_job(cfg, job.id, refresh=True)
+                        st.toast(
+                            f"Vaga avaliada: {updated.match_level.value} "
+                            f"({updated.match_score or 0:.0f}/100)"
+                        )
                         st.rerun()
 
             # Detalhes explicáveis
-            if job.match_rationale or job.strengths or job.gaps:
+            if job.strengths or job.gaps:
                 with st.expander("🔍 Justificativa e Análise de Compatibilidade"):
-                    if job.match_rationale:
-                        st.markdown(f"**Parecer:** {job.match_rationale}")
                     col_s, col_g = st.columns(2)
                     with col_s:
                         st.markdown("**Pontos Fortes Identificados:**")
@@ -418,11 +409,11 @@ def render_jobs_tab(cfg: AppConfig, storage: JsonStorage) -> None:
         st.subheader("Cadastrar Nova Oportunidade")
         c_url, c_btn = st.columns([4, 1])
         url_input = c_url.text_input("URL da Vaga no LinkedIn (jobs/view/<ID>):")
-        if c_btn.button("Cadastrar via URL", use_container_width=True):
+        if c_btn.button("Cadastrar via URL", width="stretch"):
             if url_input.strip():
                 try:
                     with st.spinner("Processando e registrando vaga..."):
-                        new_job = register_job_by_url(cfg, url_input.strip())
+                        new_job = asyncio.run(register_job_by_url(cfg, job_url=url_input.strip()))
                         st.success(f"Vaga cadastrada com sucesso: {new_job.title}!")
                         st.rerun()
                 except Exception as e:
@@ -471,7 +462,7 @@ def render_jobs_tab(cfg: AppConfig, storage: JsonStorage) -> None:
         s_keywords = col_k.text_input("Cargo ou Palavra-chave", value="Assistente Administrativo")
         s_loc = col_l.text_input("Localização", value="Porto Alegre e Região")
         s_limit = col_q.number_input("Limite", min_value=1, max_value=20, value=5)
-        if col_b.button("Buscar Vagas", use_container_width=True):
+        if col_b.button("Buscar Vagas", width="stretch"):
             with st.spinner("Buscando vagas no LinkedIn via Playwright..."):
                 try:
                     found = asyncio.run(
@@ -523,7 +514,7 @@ def render_recruiters_tab(cfg: AppConfig, storage: JsonStorage) -> None:
 
             with col_r_actions:
                 btn_draft_key = f"draft_btn_{rec.id}"
-                if st.button("✍️ Gerar Rascunho", key=btn_draft_key, use_container_width=True):
+                if st.button("✍️ Gerar Rascunho", key=btn_draft_key, width="stretch"):
                     with st.spinner("Gerando rascunho..."):
                         generate_message_draft(
                             config=cfg,
@@ -554,10 +545,10 @@ def render_recruiters_tab(cfg: AppConfig, storage: JsonStorage) -> None:
                         id=rec_id,
                         name=nr_name.strip(),
                         linkedin_url=nr_url.strip() if nr_url.strip() else None,
-                        current_title=nr_title.strip() if nr_title.strip() else None,
-                        current_company=nr_comp.strip() if nr_comp.strip() else "Pendente",
+                        current_title=nr_title.strip() or "Recrutamento e Seleção",
+                        current_company=nr_comp.strip() or "Pendente",
                         company_verified=bool(nr_comp.strip()),
-                        location=nr_loc.strip(),
+                        location=nr_loc.strip() or "a confirmar",
                         recruitment_focus=focus_list,
                     )
                     storage.upsert_recruiter(new_rec)
@@ -584,7 +575,7 @@ def render_companies_tab(cfg: AppConfig, storage: JsonStorage) -> None:
                 st.markdown(f"### {comp.name}")
                 st.markdown(f"**Setor:** {comp.industry or 'a confirmar'}")
             with c2:
-                st.markdown(f"**Sede:** {comp.headquarters or 'a confirmar'}")
+                st.markdown(f"**Sede:** {comp.location or 'a confirmar'}")
                 if comp.website:
                     st.markdown(f"[🌐 Site Oficial]({comp.website})")
             with c3:
@@ -656,17 +647,17 @@ def render_messages_tab(cfg: AppConfig, storage: JsonStorage) -> None:
 
     with col_actions:
         st.markdown("**Ações de Revisão Humana:**")
-        if st.button("✅ Aprovar Rascunho", use_container_width=True):
+        if st.button("✅ Aprovar Rascunho", width="stretch"):
             review_message(cfg, selected_msg.id, status=ReviewStatus.APPROVED)
             st.success("Rascunho marcado como Aprovado!")
             st.rerun()
 
-        if st.button("❌ Rejeitar Rascunho", use_container_width=True):
-            review_message(cfg, selected_msg.id, status=ReviewStatus.REJECTED)
-            st.warning("Rascunho marcado como Rejeitado.")
+        if st.button("❌ Descartar Rascunho", width="stretch"):
+            review_message(cfg, selected_msg.id, status=ReviewStatus.DISCARDED)
+            st.warning("Rascunho marcado como Descartado.")
             st.rerun()
 
-        if st.button("🚀 Marcar como Enviado no LinkedIn", use_container_width=True):
+        if st.button("🚀 Marcar como Enviado no LinkedIn", width="stretch"):
             review_message(cfg, selected_msg.id, mark_sent=True)
             st.success("Registrado como enviado manualmente pelo usuário!")
             st.rerun()
@@ -714,7 +705,7 @@ def render_report_tab(cfg: AppConfig, storage: JsonStorage) -> None:
 
     col_btn, col_down = st.columns([2, 1])
     with col_btn:
-        if st.button("🔄 Atualizar Relatório com Dados Mais Recentes", use_container_width=True):
+        if st.button("🔄 Atualizar Relatório com Dados Mais Recentes", width="stretch"):
             with st.spinner("Gerando relatório..."):
                 generate_consolidated_report(cfg)
                 st.success("Relatório consolidado atualizado!")
@@ -728,7 +719,7 @@ def render_report_tab(cfg: AppConfig, storage: JsonStorage) -> None:
                 data=content,
                 file_name="relatorio_consolidado.md",
                 mime="text/markdown",
-                use_container_width=True,
+                width="stretch",
             )
         st.divider()
         st.markdown(content)
@@ -752,8 +743,8 @@ def render_settings_tab(cfg: AppConfig, storage: JsonStorage) -> None:
 
     with t1:
         st.subheader("Sessão Persistente do Playwright")
-        st.markdown(f"**Diretório do Perfil:** `{cfg.playwright_profile_dir}`")
-        has_session = has_persistent_session(cfg.playwright_profile_dir)
+        st.markdown(f"**Diretório do Perfil:** `{cfg.user_data_dir}`")
+        has_session = has_persistent_session(cfg.user_data_dir)
 
         if has_session:
             st.success(
@@ -788,16 +779,23 @@ def render_settings_tab(cfg: AppConfig, storage: JsonStorage) -> None:
         st.subheader("Verificação do Ambiente")
         st.markdown(f"**Raiz do Projeto:** `{cfg.project_root}`")
         st.markdown(f"**Diretório de Dados:** `{cfg.data_dir}`")
-        st.markdown(f"**Currículo em PDF:** `{cfg.curriculum_pdf_path}`")
+        st.markdown(f"**Currículo em PDF:** `{cfg.curriculum_path}`")
         st.markdown(f"**Diretório de Saída:** `{cfg.output_dir}`")
 
-        # Visualizador de log
+        # Visualizadores de log
         log_file = cfg.logs_dir / "linkedin_researcher.log"
         if log_file.exists():
             with st.expander("📄 Ver Logs Recentes da Aplicação"):
                 lines = log_file.read_text(encoding="utf-8").splitlines()
                 recent = "\n".join(lines[-40:])
                 st.code(recent, language="text")
+
+        web_log_file = cfg.logs_dir / "web_server.log"
+        if web_log_file.exists():
+            with st.expander("🌐 Ver Logs do Servidor Web (web_server.log)"):
+                web_lines = web_log_file.read_text(encoding="utf-8").splitlines()
+                recent_web = "\n".join(web_lines[-60:])
+                st.code(recent_web, language="text")
 
 
 def main() -> None:

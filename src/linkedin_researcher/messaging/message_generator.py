@@ -454,8 +454,9 @@ def review_message(
     status: ReviewStatus | None = None,
     mark_sent: bool = False,
     notes: str | None = None,
+    edited_text: str | None = None,
 ) -> SuggestedMessage:
-    """Atualiza o status de revisão humana e registro manual de envio de uma mensagem."""
+    """Atualiza o texto editado, status de revisão humana e registro manual de envio."""
     storage = JsonStorage(config)
     msg = storage.get_message(message_id)
     if msg is None:
@@ -465,6 +466,11 @@ def review_message(
         )
 
     updates: dict[str, object] = {}
+    if edited_text is not None and edited_text.strip():
+        updates["message_text"] = edited_text.strip()
+        if status is None:
+            updates["review_status"] = ReviewStatus.EDITED
+
     if status is not None:
         updates["review_status"] = status
 

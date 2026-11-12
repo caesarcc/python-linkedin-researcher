@@ -9,6 +9,17 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from linkedin_researcher.cli import build_parser, run_web
+from linkedin_researcher.messaging.message_generator import review_message
+from linkedin_researcher.models import (
+    Company,
+    Job,
+    JobStatus,
+    MatchLevel,
+    Recruiter,
+    ReviewStatus,
+    SuggestedMessage,
+)
+from linkedin_researcher.storage import JsonStorage
 
 
 def test_web_app_file_exists() -> None:
@@ -115,4 +126,152 @@ def test_developing_with_streamlit_skill_discovery() -> None:
         / "discover.py"
     )
     assert discover_script.exists()
+
+
+def test_review_message_edited_text(app_config, tmp_path: Path) -> None:
+    """Valida que review_message persiste edição manual do texto com status EDITED."""
+    isolated_cfg = replace(
+        app_config,
+        data_dir=tmp_path / "data",
+        output_dir=tmp_path / "output",
+        logs_dir=tmp_path / "logs",
+    )
+    storage = JsonStorage(isolated_cfg)
+    storage.upsert_recruiter(
+        Recruiter(
+            id="rec-web-01",
+            name="Recrutadora Exemplo",
+            linkedin_url="https://www.linkedin.com/in/rec-exemplo",
+            current_title="Tech Recruiter",
+            location="Porto Alegre, RS",
+        )
+    )
+    storage.upsert_message(
+        SuggestedMessage(
+            id="msg-edit-01",
+            recruiter_id="rec-web-01",
+            context="Contato inicial para vaga de Engenharia de Dados",
+            message_text="Texto original do rascunho para revisão.",
+            created_at="2026-11-11T10:00:00",
+        )
+    )
+
+    updated = review_message(
+        isolated_cfg,
+        "msg-edit-01",
+        edited_text="Texto ajustado manualmente antes do envio.",
+    )
+    assert updated.message_text == "Texto ajustado manualmente antes do envio."
+    assert updated.review_status == ReviewStatus.EDITED
+
+    reloaded = storage.get_message("msg-edit-01")
+    assert reloaded is not None
+    assert reloaded.message_text == "Texto ajustado manualmente antes do envio."
+    assert reloaded.review_status == ReviewStatus.EDITED
+
+
+def test_web_tabs_render_without_errors(app_config, tmp_path: Path) -> None:
+    """Renderiza todas as abas do Streamlit com dados reais sem AttributeError ou exceções."""
+    from streamlit.testing.v1 import AppTest
+
+    isolated_cfg = replace(
+        app_config,
+        data_dir=tmp_path / "data",
+        output_dir=tmp_path / "output",
+        logs_dir=tmp_path / "logs",
+        user_data_dir=tmp_path / "user_data",
+    )
+    isolated_cfg.output_dir.mkdir(parents=True, exist_ok=True)
+    isolated_cfg.logs_dir.mkdir(parents=True, exist_ok=True)
+    (isolated_cfg.output_dir / "relatorio_consolidado.md").write_text(
+        "# Relatório Consolidado\n\nConteúdo de teste.",
+        encoding="utf-8",
+    )
+    (isolated_cfg.logs_dir / "web_server.log").write_text(
+        "Uvicorn server started on localhost:8501\n",
+        encoding="utf-8",
+    )
+    (isolated_cfg.logs_dir / "linkedin_researcher.log").write_text(
+        "INFO Inicializado\n",
+        encoding="utf-8",
+    )
+
+    storage = JsonStorage(isolated_cfg)
+    storage.upsert_recruiter(
+        Recruiter(
+            id="rec-01",
+            name="Ana Recrutadora",
+            linkedin_url="https://www.linkedin.com/in/ana-recrutadora",
+            current_title="Especialista em Atração de Talentos",
+            current_company="Empresa Alpha",
+            location="São Paulo, SP",
+        )
+    )
+    storage.upsert_company(
+        Company(
+            id="comp-01",
+            name="Empresa Alpha",
+            linkedin_url="https://www.linkedin.com/company/empresa-alpha",
+            industry="Tecnologia",
+            location="São Paulo, SP",
+            source_urls=["https://www.linkedin.com/company/empresa-alpha"],
+        )
+    )
+    storage.upsert_job(
+        Job(
+            id="job-high-01",
+            title="Engenheiro de Dados Sênior",
+            company="Empresa Alpha",
+            location="Remoto",
+            work_model="Remoto",
+            application_url="https://www.linkedin.com/jobs/view/1001",
+            checked_at="2026-11-11T10:00:00",
+            match_score=89.0,
+            match_level=MatchLevel.HIGH,
+            strengths=["Python", "PySpark"],
+            gaps=["GCP"],
+        )
+    )
+    storage.upsert_job(
+        Job(
+            id="job-discarded-02",
+            title="Desenvolvedor Frontend",
+            company="Empresa Alpha",
+            location="Híbrido",
+            application_url="https://www.linkedin.com/jobs/view/1002",
+            checked_at="2026-11-11T10:00:00",
+            match_level=MatchLevel.NOT_EVALUATED,
+            status=JobStatus.DISCARDED,
+        )
+    )
+    storage.upsert_message(
+        SuggestedMessage(
+            id="msg-01",
+            recruiter_id="rec-01",
+            context="Vaga de Engenheiro de Dados Sênior",
+            message_text=(
+                "Olá Ana, tudo bem? Gostaria de me apresentar para oportunidades em Dados."
+            ),
+            created_at="2026-11-11T10:05:00",
+        )
+    )
+
+    app_path = (
+        Path(__file__).parent.parent
+        / "src"
+        / "linkedin_researcher"
+        / "web"
+        / "app.py"
+    )
+    with patch("linkedin_researcher.config.load_config", return_value=isolated_cfg):
+        at = AppTest.from_file(str(app_path))
+        at.run(timeout=15)
+        assert not at.exception, f"Exceção na carga inicial: {at.exception}"
+
+        pages = list(at.sidebar.radio[0].options)
+        assert len(pages) == 7
+        for page_name in pages:
+            at.sidebar.radio[0].set_value(page_name)
+            at.run(timeout=15)
+            assert not at.exception, f"Exceção na aba '{page_name}': {at.exception}"
 
